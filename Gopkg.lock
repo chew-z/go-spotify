@@ -71,6 +71,14 @@
   version = "v2.1.0"
 
 [[projects]]
+  branch = "master"
+  digest = "1:90f91b3ecbf37365e8c730bb4270df8e12769fe157dbd8472f7b2da9c69a2bd6"
+  name = "github.com/thinkerou/favicon"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "94a442a49da6e2d44bdd5e0d2e2e185c43a19d93"
+
+[[projects]]
   digest = "1:03aa6e485e528acb119fb32901cf99582c380225fc7d5a02758e08b180cb56c3"
   name = "github.com/ugorji/go"
   packages = ["codec"]
@@ -154,6 +162,7 @@
   input-imports = [
     "github.com/gin-gonic/gin",
     "github.com/patrickmn/go-cache",
+    "github.com/thinkerou/favicon",
     "github.com/zmb3/spotify",
     "golang.org/x/oauth2",
   ]

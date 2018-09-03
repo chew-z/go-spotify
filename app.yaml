@@ -1,0 +1,32 @@
+---
+runtime: go
+env: flex
+api_version: go1
+
+# Trick #1
+manual_scaling:
+  instances: 1
+# Trick #2 - downgrade default resources
+resources:
+  cpu: 1
+  memory_gb: 0.6
+  disk_size_gb: 10
+# Trick #3
+# gcloud app deploy --version dev
+# when done testing SWITCH OFF
+# gcloud app versions stop dev
+# and SWITCH ON
+# gcloud app versions start dev
+
+skip_files:
+  - README.md
+  - deploy.sh
+  - .gitignore
+  - Gopkg.lock
+  - Gopkg.toml
+
+handlers:
+  - url: /.*
+    script: _go_app
+
+env_variables:

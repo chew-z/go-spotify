@@ -1,2 +1,4 @@
 vendor/**
 token.json
+deploy.sh
+favicon.png

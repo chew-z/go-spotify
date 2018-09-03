@@ -10,19 +10,20 @@ import (
     "strings"
     "time"
     "golang.org/x/oauth2"
-    "github.com/gin-gonic/gin"
     "github.com/patrickmn/go-cache"
+    "github.com/thinkerou/favicon"
+    "github.com/gin-gonic/gin"
     "github.com/zmb3/spotify"
 )
 
-// redirectURI is the OAuth redirect URI for the application.
-// You must register an application at Spotify's developer portal
-// and enter this value.
-const redirectURI = "http://localhost:8080/callback"
 
 var (
     // Create a cache with a default expiration time of 15 minutes
     kaszka = cache.New(15*time.Minute, 30*time.Minute)
+    // redirectURI is the OAuth redirect URI for the application.
+    // You must register an application at Spotify's developer portal
+    // and enter this value.
+    redirectURI = os.Getenv("REDIRECT_URI")
     auth  = spotify.NewAuthenticator(redirectURI, spotify.ScopeUserReadPrivate)
     client spotify.Client
     state = "abc123"
@@ -35,6 +36,7 @@ func init() {
     // first start an HTTP server
     r := gin.New()
 
+    r.Use(favicon.New("./favicon.png"))
     r.GET("/", func(c *gin.Context) {
         c.String(http.StatusOK, "Hello World!")
     })
@@ -118,7 +120,10 @@ func init() {
         c.String(http.StatusOK, resString)
     })
 
-    r.Run() // listen and serve on 0.0.0.0:8080`
+    r.Run() // listen and serve on 0.0.0.0:8080
+    // For Google AppEngine
+    // Handle all requests using net/http
+    http.Handle("/", r)
 }
 
 /* setClient - gets token from cache or file or if not present
