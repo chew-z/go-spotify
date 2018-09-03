@@ -22,7 +22,7 @@ const redirectURI = "http://localhost:8080/callback"
 
 var (
     // Create a cache with a default expiration time of 15 minutes
-    kacha = cache.New(15*time.Minute, 30*time.Minute)
+    kaszka = cache.New(15*time.Minute, 30*time.Minute)
     auth  = spotify.NewAuthenticator(redirectURI, spotify.ScopeUserReadPrivate)
     client spotify.Client
     state = "abc123"
@@ -42,12 +42,7 @@ func init() {
         c.String(http.StatusOK, "pong")
     })
     r.GET("/user", func(c *gin.Context) {
-        tok, tokenErr := getToken()
-        if tokenErr != nil {
-            log.Println(tokenErr.Error())
-            c.String(http.StatusOK, fmt.Sprintln("Man, you don't have token"))
-        }
-        client = auth.NewClient(tok)
+        setClient(endpoint, c, r)
         user, err := client.CurrentUser()
         if err != nil {
             log.Println(err.Error())
@@ -77,10 +72,8 @@ func init() {
             log.Println(jsonErr.Error())
         }
         log.Println(string(jsonToken))
-        _ = ioutil.WriteFile("token.json", jsonToken, 0644)
-        kacha.Set("token", tok, cache.DefaultExpiration)
-        // c.SetCookie("token", tok.AccessToken, 3600, endpoint, "localhost", false, true) 
-        // c.String(http.StatusOK, "Login Completed!")
+        _ = ioutil.WriteFile("token.json", jsonToken, 0600)
+        kaszka.Set("token", tok, cache.DefaultExpiration)
         url := fmt.Sprintf("http://%s%s", c.Request.Host, endpoint)
         log.Println(url)
         // both approaches work but 2nd isn't rewriting url
@@ -90,15 +83,8 @@ func init() {
         // r.HandleContext(c)
     })
     r.GET("/top", func(c *gin.Context) {
-        tok, tokenErr := getToken()
-        if tokenErr != nil {
-            log.Println("Not found token. Authenticating first")
-            endpoint = "/top"
-            c.Request.URL.Path = "/auth"
-            r.HandleContext(c)
-            return
-        }
-        client = auth.NewClient(tok)
+        endpoint = "/top"
+        setClient(endpoint, c, r)
         top, err := client.CurrentUsersPlaylists()
         if err != nil {
             log.Println(err.Error())
@@ -119,16 +105,9 @@ func init() {
     r.GET("/search", func(c *gin.Context) {
         query := c.DefaultQuery("q", "ABBA")
         searchCategory := c.DefaultQuery("c", "track")
+        endpoint = fmt.Sprintf("/search?q=%s&c=%s", query, searchCategory)
+        setClient(endpoint, c, r)
         searchType := searchType(searchCategory)
-        tok, tokenErr := getToken()
-        if tokenErr != nil {
-            log.Println("Not found token. Authenticating first")
-            endpoint = fmt.Sprintf("/search?q=%s&c=%s", query, searchCategory)
-            c.Request.URL.Path = "/auth"
-            r.HandleContext(c)
-            return
-        }
-        client = auth.NewClient(tok)
         results, err := client.Search(query, searchType)
         if err != nil {
             log.Println(err.Error())
@@ -142,23 +121,35 @@ func init() {
     r.Run() // listen and serve on 0.0.0.0:8080`
 }
 
-func getToken() (*oauth2.Token, error)  {
-    gc, found := kacha.Get("token")
+/* setClient - gets token from cache or file or if not present
+   authorize app and return to the calling endpoint
+   r and c are just to redirect to /auth
+*/
+func setClient(endpoint string, c *gin.Context, r *gin.Engine) {
+    var tok *oauth2.Token
+    gc, found := kaszka.Get("token")
     if found {
         log.Println("Found cached token")
-        tok := gc.(*oauth2.Token)
-        return tok, nil
-    }
-    log.Println("No cached token found. Looking for saved token")
-    tok, err := tokenFromFile("./token.json")
-    if err == nil {
+        tok = gc.(*oauth2.Token)
+        client = auth.NewClient(tok)
+    } else {
+        log.Println("No cached token found. Looking for saved token")
+        tok, err := tokenFromFile("./token.json")
+        if err != nil {
+            log.Println("Not found token. Authenticating first")
+            c.Request.URL.Path = "/auth"
+            r.HandleContext(c)
+        }
+        log.Printf("%v", *tok)
+        client = auth.NewClient(tok)
+        kaszka.Set("token", tok, cache.DefaultExpiration)
         log.Println("Cached token")
-        kacha.Set("token", tok, cache.DefaultExpiration)
     }
-    return tok, err
+    return
 }
 
-// Retrieves a token from a local file.
+// Retrieves a token from a local JSON file.
+// https://developers.google.com/tasks/quickstart/go
 func tokenFromFile(file string) (*oauth2.Token, error) {
     f, err := os.Open(file)
     defer f.Close()
@@ -217,4 +208,3 @@ func searchType(a string) spotify.SearchType {
             return spotify.SearchTypeTrack
     }
 }
-
