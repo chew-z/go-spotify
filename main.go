@@ -1,7 +1,9 @@
 package main
 
 import (
+    "encoding/json"
     "fmt"
+    "io/ioutil"
     "log"
     "net/http"
     "strings"
@@ -64,6 +66,12 @@ func init() {
             log.Fatalf("State mismatch: %s != %s\n", st, state)
         }
         client = auth.NewClient(tok)
+        jsonToken, jsonErr := json.MarshalIndent(tok, "    ", "    ")
+        if jsonErr != nil {
+            log.Println(jsonErr.Error())
+        }
+        log.Println(string(jsonToken))
+        _ = ioutil.WriteFile("token.json", jsonToken, 0644)
         kacha.Set("token", tok, cache.DefaultExpiration)
         // c.SetCookie("token", tok.AccessToken, 3600, endpoint, "localhost", false, true) 
         // c.String(http.StatusOK, "Login Completed!")
