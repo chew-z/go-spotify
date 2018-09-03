@@ -6,6 +6,7 @@ import (
     "io/ioutil"
     "log"
     "net/http"
+    "os"
     "strings"
     "time"
     "golang.org/x/oauth2"
@@ -28,7 +29,6 @@ var (
     endpoint = "/user"
 )
 
-
 func main() {}
 
 func init() {
@@ -42,10 +42,16 @@ func init() {
         c.String(http.StatusOK, "pong")
     })
     r.GET("/user", func(c *gin.Context) {
+        tok, tokenErr := getToken()
+        if tokenErr != nil {
+            log.Println(tokenErr.Error())
+            c.String(http.StatusOK, fmt.Sprintln("Man, you don't have token"))
+        }
+        client = auth.NewClient(tok)
         user, err := client.CurrentUser()
         if err != nil {
             log.Println(err.Error())
-            c.String(http.StatusOK, fmt.Sprintln("Man, you are no one "))
+            c.String(http.StatusOK, fmt.Sprintln("Man, you are no one"))
         } else {
             c.String(http.StatusOK, fmt.Sprintln("Man, you are", user.ID))
         }
@@ -84,18 +90,15 @@ func init() {
         // r.HandleContext(c)
     })
     r.GET("/top", func(c *gin.Context) {
-        gc, found := kacha.Get("token")
-        if found {
-            log.Println("Found token")
-            tok := gc.(*oauth2.Token)
-            client = auth.NewClient(tok)
-        } else {
+        tok, tokenErr := getToken()
+        if tokenErr != nil {
             log.Println("Not found token. Authenticating first")
             endpoint = "/top"
             c.Request.URL.Path = "/auth"
             r.HandleContext(c)
             return
         }
+        client = auth.NewClient(tok)
         top, err := client.CurrentUsersPlaylists()
         if err != nil {
             log.Println(err.Error())
@@ -104,9 +107,9 @@ func init() {
             var b strings.Builder
             b.WriteString("Top playlists:")
             for _, item := range top.Playlists {
-                b.WriteString("\n-")
+                b.WriteString("\n- ")
                 b.WriteString(item.Name)
-                b.WriteString(":")
+                b.WriteString(" : ")
                 b.WriteString(item.Owner.ID)
             }
             endpoint = "/user"
@@ -116,19 +119,16 @@ func init() {
     r.GET("/search", func(c *gin.Context) {
         query := c.DefaultQuery("q", "ABBA")
         searchCategory := c.DefaultQuery("c", "track")
-        gc, found := kacha.Get("token")
-        if found {
-            log.Println("Found token")
-            tok := gc.(*oauth2.Token)
-            client = auth.NewClient(tok)
-        } else {
+        searchType := searchType(searchCategory)
+        tok, tokenErr := getToken()
+        if tokenErr != nil {
             log.Println("Not found token. Authenticating first")
             endpoint = fmt.Sprintf("/search?q=%s&c=%s", query, searchCategory)
             c.Request.URL.Path = "/auth"
             r.HandleContext(c)
             return
         }
-        searchType := searchType(searchCategory)
+        client = auth.NewClient(tok)
         results, err := client.Search(query, searchType)
         if err != nil {
             log.Println(err.Error())
@@ -138,23 +138,36 @@ func init() {
         endpoint = "/user"
         c.String(http.StatusOK, resString)
     })
- 
+
     r.Run() // listen and serve on 0.0.0.0:8080`
 }
 
-func searchType(a string) spotify.SearchType {
-    switch a {
-        case "track":
-            return spotify.SearchTypeTrack
-        case "playlist":
-            return spotify.SearchTypePlaylist
-        case "album":
-            return spotify.SearchTypeAlbum
-        case "artist":
-            return spotify.SearchTypeArtist
-        default:
-            return spotify.SearchTypeTrack
+func getToken() (*oauth2.Token, error)  {
+    gc, found := kacha.Get("token")
+    if found {
+        log.Println("Found cached token")
+        tok := gc.(*oauth2.Token)
+        return tok, nil
     }
+    log.Println("No cached token found. Looking for saved token")
+    tok, err := tokenFromFile("./token.json")
+    if err == nil {
+        log.Println("Cached token")
+        kacha.Set("token", tok, cache.DefaultExpiration)
+    }
+    return tok, err
+}
+
+// Retrieves a token from a local file.
+func tokenFromFile(file string) (*oauth2.Token, error) {
+    f, err := os.Open(file)
+    defer f.Close()
+    if err != nil {
+        return nil, err
+    }
+    tok := &oauth2.Token{}
+    err = json.NewDecoder(f).Decode(tok)
+    return tok, err
 }
 
 func handleSearchResults(results *spotify.SearchResult) string {
@@ -189,3 +202,19 @@ func handleSearchResults(results *spotify.SearchResult) string {
     }
     return b.String()
 }
+
+func searchType(a string) spotify.SearchType {
+    switch a {
+        case "track":
+            return spotify.SearchTypeTrack
+        case "playlist":
+            return spotify.SearchTypePlaylist
+        case "album":
+            return spotify.SearchTypeAlbum
+        case "artist":
+            return spotify.SearchTypeArtist
+        default:
+            return spotify.SearchTypeTrack
+    }
+}
+
