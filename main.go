@@ -16,6 +16,10 @@ import (
     "github.com/zmb3/spotify"
 )
 
+const (
+    maxLists = 5
+    maxTracks = 5
+)
 
 var (
     // Create a cache with a default expiration time of 15 minutes
@@ -187,29 +191,38 @@ func handleAudioFeatures(results *spotify.SearchResult) string {
     b.WriteString("Energy, Valence, Loud, Tempo, Acoustic, Instrumental, Dance, Speach\n")
     if results.Tracks != nil {
         tracks := results.Tracks.Tracks
+        var tr []spotify.ID
         for _, item := range tracks {
             b.WriteString(fmt.Sprintf(" - %s - %s:\n", item.Name, item.Artists[0].Name))
-            res, _ := client.GetAudioFeatures(item.ID) // GetAudioFeatures has variadic argument
-            b.WriteString(fmt.Sprintf("  %.4f | %.4f | %.4f | %.4f |", res[0].Energy, res[0].Valence, res[0].Loudness, res[0].Tempo))
-            b.WriteString(fmt.Sprintf(" %.4f | %.4f |", res[0].Acousticness, res[0].Instrumentalness))
-            b.WriteString(fmt.Sprintf(" %.4f | %.4f |", res[0].Danceability, res[0].Speechiness))
+            tr = append(tr, item.ID)
+        }
+        audioFeatures, _ := client.GetAudioFeatures(tr...) // GetAudioFeatures has variadic argument
+        for _, res := range audioFeatures {
+            b.WriteString(fmt.Sprintf("  %.4f | %.4f | %.4f | %.4f |", res.Energy, res.Valence, res.Loudness, res.Tempo))
+            // b.WriteString(fmt.Sprintf(" %.4f | %.4f |", res.Acousticness, res.Instrumentalness))
+            // b.WriteString(fmt.Sprintf(" %.4f | %.4f |", res.Danceability, res.Speechiness))
             b.WriteString("\n")
-            // b.WriteString(fmt.Sprintf("\n%v\n%v\n", res[0].AnalysisURL, res[0].TrackURL))
+            // b.WriteString(fmt.Sprintf("\n%v\n%v\n", res.AnalysisURL, res.TrackURL))
         }
     }
     if results.Playlists != nil {
         playlists := results.Playlists.Playlists
         for i, pl := range playlists {
-            if i >= 4 { break }
+            if i >= maxLists { break }
             playlist, _ := client.GetPlaylist(pl.Owner.ID, pl.ID)
             b.WriteString(fmt.Sprintf("\n  %s - %s\n", playlist.Name, playlist.Description))
-            for j, tr := range playlist.Tracks.Tracks {
-                if j >= 5 { break }
-                b.WriteString(fmt.Sprintf("%s - %s\n", tr.Track.Name, tr.Track.Artists[0].Name))
-                res, _ := client.GetAudioFeatures(tr.Track.ID) // GetAudioFeatures has variadic argument
-                b.WriteString(fmt.Sprintf("  %.4f | %.4f | %.4f | %.4f |", res[0].Energy, res[0].Valence, res[0].Loudness, res[0].Tempo))
-                b.WriteString(fmt.Sprintf(" %.4f | %.4f |", res[0].Acousticness, res[0].Instrumentalness))
-                b.WriteString(fmt.Sprintf(" %.4f | %.4f |", res[0].Danceability, res[0].Speechiness))
+            var tr []spotify.ID
+            for j, item := range playlist.Tracks.Tracks {
+                if j >= maxTracks { break }
+                b.WriteString(fmt.Sprintf(" - %s - %s:\n", item.Track.Name, item.Track.Artists[0].Name))
+                tr = append(tr, item.Track.ID)
+            }
+            // using multiple track.IDs at once saves us many, many calls to Spotify
+            audioFeatures, _ := client.GetAudioFeatures(tr...) // GetAudioFeatures has variadic argument
+            for _, res := range audioFeatures {
+                b.WriteString(fmt.Sprintf("  %.4f | %.4f | %.4f | %.4f |", res.Energy, res.Valence, res.Loudness, res.Tempo))
+                // b.WriteString(fmt.Sprintf(" %.4f | %.4f |", res.Acousticness, res.Instrumentalness))
+                // b.WriteString(fmt.Sprintf(" %.4f | %.4f |", res.Danceability, res.Speechiness))
                 b.WriteString("\n")
             }
         }
