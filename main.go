@@ -121,15 +121,16 @@ func init() {
     })
     r.GET("/analyze", func(c *gin.Context) {
         query := c.DefaultQuery("q", "ABBA")
-        endpoint = fmt.Sprintf("/analyze?q=%s", query)
+        searchCategory := c.DefaultQuery("c", "track")
+        endpoint = fmt.Sprintf("/analyze?q=%s&c=%s", query, searchCategory)
         setClient(endpoint, c, r)
-        searchType := searchType("track")
+        searchType := searchType(searchCategory)
         results, err := client.Search(query, searchType)
         if err != nil {
             log.Println(err.Error())
             c.String(http.StatusNotFound, err.Error())
         }
-        resString := handleAudioFeatures(results.Tracks.Tracks)
+        resString := handleAudioFeatures(results)
 
         endpoint = "/user"
         c.String(http.StatusOK, resString)
@@ -180,18 +181,39 @@ func tokenFromFile(file string) (*oauth2.Token, error) {
     return tok, err
 }
 
-func handleAudioFeatures(tracks []spotify.FullTrack) string {
+func handleAudioFeatures(results *spotify.SearchResult) string {
     var b strings.Builder
     b.WriteString("Analysis:\n")
-    b.WriteString(" Energy, Dance, Instrument, Loud, Speach, Tempo, Valence\n")
-    for _, item := range tracks {
-        b.WriteString(fmt.Sprintf("  %s - %s:\n", item.Name, item.Artists[0].Name))
-        res, _ := client.GetAudioFeatures(item.ID) // GetAudioFeatures has variadic argument
-        b.WriteString(fmt.Sprintf("  %.4f | %.4f | %.4f | ", res[0].Energy, res[0].Danceability, res[0].Instrumentalness))
-        b.WriteString(fmt.Sprintf("%.4f | %.4f | %.4f | ", res[0].Loudness, res[0].Speechiness, res[0].Tempo))
-        b.WriteString(fmt.Sprintf("%.4f\n", res[0].Valence))
+    b.WriteString("Energy, Valence, Loud, Tempo, Acoustic, Instrumental, Dance, Speach\n")
+    if results.Tracks != nil {
+        tracks := results.Tracks.Tracks
+        for _, item := range tracks {
+            b.WriteString(fmt.Sprintf(" - %s - %s:\n", item.Name, item.Artists[0].Name))
+            res, _ := client.GetAudioFeatures(item.ID) // GetAudioFeatures has variadic argument
+            b.WriteString(fmt.Sprintf("  %.4f | %.4f | %.4f | %.4f |", res[0].Energy, res[0].Valence, res[0].Loudness, res[0].Tempo))
+            b.WriteString(fmt.Sprintf(" %.4f | %.4f |", res[0].Acousticness, res[0].Instrumentalness))
+            b.WriteString(fmt.Sprintf(" %.4f | %.4f |", res[0].Danceability, res[0].Speechiness))
+            b.WriteString("\n")
+            // b.WriteString(fmt.Sprintf("\n%v\n%v\n", res[0].AnalysisURL, res[0].TrackURL))
+        }
     }
-
+    if results.Playlists != nil {
+        playlists := results.Playlists.Playlists
+        for i, pl := range playlists {
+            if i >= 4 { break }
+            playlist, _ := client.GetPlaylist(pl.Owner.ID, pl.ID)
+            b.WriteString(fmt.Sprintf("\n  %s - %s\n", playlist.Name, playlist.Description))
+            for j, tr := range playlist.Tracks.Tracks {
+                if j >= 5 { break }
+                b.WriteString(fmt.Sprintf("%s - %s\n", tr.Track.Name, tr.Track.Artists[0].Name))
+                res, _ := client.GetAudioFeatures(tr.Track.ID) // GetAudioFeatures has variadic argument
+                b.WriteString(fmt.Sprintf("  %.4f | %.4f | %.4f | %.4f |", res[0].Energy, res[0].Valence, res[0].Loudness, res[0].Tempo))
+                b.WriteString(fmt.Sprintf(" %.4f | %.4f |", res[0].Acousticness, res[0].Instrumentalness))
+                b.WriteString(fmt.Sprintf(" %.4f | %.4f |", res[0].Danceability, res[0].Speechiness))
+                b.WriteString("\n")
+            }
+        }
+    }
     return b.String()
 }
 
