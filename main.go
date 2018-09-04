@@ -119,7 +119,21 @@ func init() {
         endpoint = "/user"
         c.String(http.StatusOK, resString)
     })
+    r.GET("/analyze", func(c *gin.Context) {
+        query := c.DefaultQuery("q", "ABBA")
+        endpoint = fmt.Sprintf("/analyze?q=%s", query)
+        setClient(endpoint, c, r)
+        searchType := searchType("track")
+        results, err := client.Search(query, searchType)
+        if err != nil {
+            log.Println(err.Error())
+            c.String(http.StatusNotFound, err.Error())
+        }
+        resString := handleAudioFeatures(results.Tracks.Tracks)
 
+        endpoint = "/user"
+        c.String(http.StatusOK, resString)
+    })
     r.Run() // listen and serve on 0.0.0.0:8080
     // For Google AppEngine
     // Handle all requests using net/http
@@ -166,13 +180,28 @@ func tokenFromFile(file string) (*oauth2.Token, error) {
     return tok, err
 }
 
+func handleAudioFeatures(tracks []spotify.FullTrack) string {
+    var b strings.Builder
+    b.WriteString("Analysis:\n")
+    b.WriteString(" Energy, Dance, Instrument, Loud, Speach, Tempo, Valence\n")
+    for _, item := range tracks {
+        b.WriteString(fmt.Sprintf("  %s - %s:\n", item.Name, item.Artists[0].Name))
+        res, _ := client.GetAudioFeatures(item.ID) // GetAudioFeatures has variadic argument
+        b.WriteString(fmt.Sprintf("  %.4f | %.4f | %.4f | ", res[0].Energy, res[0].Danceability, res[0].Instrumentalness))
+        b.WriteString(fmt.Sprintf("%.4f | %.4f | %.4f | ", res[0].Loudness, res[0].Speechiness, res[0].Tempo))
+        b.WriteString(fmt.Sprintf("%.4f\n", res[0].Valence))
+    }
+
+    return b.String()
+}
+
 func handleSearchResults(results *spotify.SearchResult) string {
     var b strings.Builder
     // handle album results
     if results.Albums != nil {
         b.WriteString("\nAlbums:\n")
         for _, item := range results.Albums.Albums {
-            b.WriteString(fmt.Sprintf("- %s : %s\n", item.Name, item.Artists[0].Name))
+            b.WriteString(fmt.Sprintf("  %s - %s : %s\n", item.ID, item.Name, item.Artists[0].Name))
         }
     }
     // handle playlist results
@@ -186,7 +215,7 @@ func handleSearchResults(results *spotify.SearchResult) string {
     if results.Tracks != nil {
         b.WriteString("\nTracks:\n")
         for _, item := range results.Tracks.Tracks {
-            b.WriteString(fmt.Sprintf("- %s : %s\n", item.Name, item.Album.Name))
+            b.WriteString(fmt.Sprintf("  %s - %s : %s\n", item.ID, item.Name, item.Album.Name))
         }
     }
     // handle artists results
