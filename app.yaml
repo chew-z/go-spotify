@@ -1,7 +1,6 @@
 ---
-runtime: go
-env: flex
-api_version: go1
+runtime: go113
+env: standard
 
 # Trick #1
 manual_scaling:
@@ -18,15 +17,9 @@ resources:
 # and SWITCH ON
 # gcloud app versions start dev
 
-skip_files:
-  - README.md
-  - deploy.sh
-  - .gitignore
-  - Gopkg.lock
-  - Gopkg.toml
-
 handlers:
   - url: /.*
-    script: _go_app
+    script: auto
 
-env_variables:
+includes:
+  - .env.yaml
