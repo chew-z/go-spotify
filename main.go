@@ -24,7 +24,7 @@ const (
 
 var (
 	// Create a cache with a default expiration time of 15 minutes
-	kaszka = cache.New(15*time.Minute, 30*time.Minute)
+	kaszka = cache.New(60*time.Minute, 5*time.Minute)
 	// redirectURI is the OAuth redirect URI for the application.
 	// You must register an application at Spotify's developer portal
 	// and enter this value.
@@ -70,6 +70,7 @@ func init() {
 	router.GET("/top", top)
 	router.GET("/search", search)
 	router.GET("/analyze", analyze)
+	router.GET("/reset", reset)
 	router.Run() // listen and serve on 0.0.0.0:8080
 	// For Google AppEngine
 	// Handle all requests using net/http
@@ -104,6 +105,14 @@ func callback(c *gin.Context) {
 	// c.Request.URL.Path = endpoint
 	// router.HandleContext(c)
 	return
+}
+
+func reset(c *gin.Context) {
+	kaszka.Delete("token")
+	kaszka.Delete("client")
+	_ = ioutil.WriteFile("token.json", []byte(""), 0600)
+
+	c.String(http.StatusOK, "Reseted")
 }
 
 /* top -
@@ -185,7 +194,7 @@ func setClient(endpoint string, c *gin.Context, r *gin.Engine) {
 				c.Request.URL.Path = "/auth"
 				r.HandleContext(c)
 			}
-			// log.Printf("%v", *tok)
+			log.Printf("%v", *tok)
 			client = auth.NewClient(tok)
 			kaszka.Set("token", tok, cache.DefaultExpiration)
 			log.Println("Token cached")
