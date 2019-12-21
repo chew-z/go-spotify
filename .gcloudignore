@@ -2,3 +2,6 @@ README.md
 deploy.sh
 .gitignore
 bin/**
+token.json
+main.bak
+main.go.bak

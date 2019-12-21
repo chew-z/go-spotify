@@ -3,3 +3,5 @@ deploy.sh
 favicon.png
 bin/**
 .env.yaml
+main.bak
+main.go.bak

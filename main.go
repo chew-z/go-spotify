@@ -88,7 +88,6 @@ func callback(c *gin.Context) {
 		c.String(http.StatusNotFound, "State mismatch")
 		log.Fatalf("State mismatch: %s != %s\n", st, state)
 	}
-	client = auth.NewClient(tok)
 	jsonToken, jsonErr := json.MarshalIndent(tok, "    ", "    ")
 	if jsonErr != nil {
 		log.Println(jsonErr.Error())
@@ -96,6 +95,7 @@ func callback(c *gin.Context) {
 	log.Println(string(jsonToken))
 	_ = ioutil.WriteFile("token.json", jsonToken, 0600)
 	kaszka.Set("token", tok, cache.DefaultExpiration)
+	client = auth.NewClient(tok)
 	url := fmt.Sprintf("http://%s%s", c.Request.Host, endpoint)
 	log.Println(url)
 	// both approaches work but 2nd isn't rewriting url
@@ -167,24 +167,31 @@ func analyze(c *gin.Context) {
    r and c are just to redirect to /auth
 */
 func setClient(endpoint string, c *gin.Context, r *gin.Engine) {
-	var tok *oauth2.Token
-	gc, found := kaszka.Get("token")
-	if found {
-		log.Println("Found cached token")
-		tok = gc.(*oauth2.Token)
-		client = auth.NewClient(tok)
+	// var tok *oauth2.Token
+	if gclient, foundClient := kaszka.Get("client"); foundClient {
+		log.Println("Found cached client")
+		client = gclient.(spotify.Client)
 	} else {
-		log.Println("No cached token found. Looking for saved token")
-		tok, err := tokenFromFile("./token.json")
-		if err != nil {
-			log.Println("Not found token. Authenticating first")
-			c.Request.URL.Path = "/auth"
-			r.HandleContext(c)
+		log.Println("No cached client found. Looking for token in order to create Spotify client.")
+		if gtoken, foundToken := kaszka.Get("token"); foundToken {
+			log.Println("Found cached token")
+			tok := gtoken.(*oauth2.Token)
+			client = auth.NewClient(tok)
+		} else {
+			log.Println("No cached token found. Looking for token saved in file token.json")
+			tok, err := tokenFromFile("./token.json")
+			if err != nil {
+				log.Println("Not found token. Authenticating first")
+				c.Request.URL.Path = "/auth"
+				r.HandleContext(c)
+			}
+			// log.Printf("%v", *tok)
+			client = auth.NewClient(tok)
+			kaszka.Set("token", tok, cache.DefaultExpiration)
+			log.Println("Token cached")
 		}
-		log.Printf("%v", *tok)
-		client = auth.NewClient(tok)
-		kaszka.Set("token", tok, cache.DefaultExpiration)
-		log.Println("Cached token")
+		kaszka.Set("client", client, cache.DefaultExpiration)
+		log.Println("Client cached")
 	}
 	return
 }
