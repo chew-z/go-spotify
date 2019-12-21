@@ -24,7 +24,7 @@ const (
 
 var (
 	// Create a cache with a default expiration time of 15 minutes
-	kaszka = cache.New(60*time.Minute, 5*time.Minute)
+	kaszka = cache.New(15*time.Minute, 1*time.Minute)
 	// redirectURI is the OAuth redirect URI for the application.
 	// You must register an application at Spotify's developer portal
 	// and enter this value.
@@ -33,7 +33,7 @@ var (
 	client      spotify.Client
 	router      *gin.Engine
 	state       = "abc123"
-	endpoint    = "/user"
+	endpoint    = "/"
 )
 
 func main() {
@@ -51,21 +51,8 @@ func init() {
 	router.GET("/ping", func(c *gin.Context) {
 		c.String(http.StatusOK, "pong")
 	})
-	router.GET("/user", func(c *gin.Context) {
-		setClient(endpoint, c, router)
-		user, err := client.CurrentUser()
-		if err != nil {
-			log.Println(err.Error())
-			c.String(http.StatusOK, fmt.Sprintln("Man, you are no one"))
-		} else {
-			c.String(http.StatusOK, fmt.Sprintln("Man, you are", user.ID))
-		}
-	})
-	router.GET("/auth", func(c *gin.Context) {
-		url := auth.AuthURL(state)
-		log.Println("Please log in to Spotify by visiting the following page in your browser:", url)
-		c.Redirect(http.StatusMovedPermanently, url)
-	})
+	router.GET("/whoami", checkUser)
+	router.GET("/auth", authorize)
 	router.GET("/callback", callback)
 	router.GET("/top", top)
 	router.GET("/search", search)
@@ -75,6 +62,24 @@ func init() {
 	// For Google AppEngine
 	// Handle all requests using net/http
 	http.Handle("/", router)
+}
+
+func checkUser(c *gin.Context) {
+	setClient("/whoami", c, router)
+	user, err := client.CurrentUser() //if client is not declared panic and chaos ensues
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.String(http.StatusOK, fmt.Sprintln("Man, you are", user.ID))
+}
+
+func authorize(c *gin.Context) {
+	url := auth.AuthURL(state)
+	log.Println("Please log in to Spotify by visiting the following page in your browser:", url)
+	kaszka.Delete("token")
+	kaszka.Delete("client")
+	defer c.Redirect(http.StatusMovedPermanently, url)
 }
 
 /* callback -
@@ -93,18 +98,18 @@ func callback(c *gin.Context) {
 	if jsonErr != nil {
 		log.Println(jsonErr.Error())
 	}
-	log.Println(string(jsonToken))
 	_ = ioutil.WriteFile("token.json", jsonToken, 0600)
-	kaszka.Set("token", tok, cache.DefaultExpiration)
+	// log.Printf("callback: Token saved to file\n%s", string(jsonToken))
+	kaszka.Set("token", tok, tok.Expiry.Sub(time.Now()))
+	log.Println("callback: Token cached")
 	client = auth.NewClient(tok)
 	url := fmt.Sprintf("http://%s%s", c.Request.Host, endpoint)
-	log.Println(url)
+	log.Printf("callback: redirecting to endpoint %s", url)
 	// both approaches work but 2nd isn't rewriting url
 	// defer redirect until finish otherwise we are looping ...
 	defer c.Redirect(http.StatusMovedPermanently, url)
 	// c.Request.URL.Path = endpoint
 	// router.HandleContext(c)
-	return
 }
 
 func reset(c *gin.Context) {
@@ -118,8 +123,7 @@ func reset(c *gin.Context) {
 /* top -
  */
 func top(c *gin.Context) {
-	endpoint = "/top"
-	setClient(endpoint, c, router)
+	setClient("/top", c, router)
 	top, err := client.CurrentUsersPlaylists()
 	if err != nil {
 		log.Println(err.Error())
@@ -133,10 +137,9 @@ func top(c *gin.Context) {
 			b.WriteString(" : ")
 			b.WriteString(item.Owner.ID)
 		}
-		endpoint = "/user"
+		// endpoint = "/user"
 		c.String(http.StatusOK, b.String())
 	}
-	return
 }
 func search(c *gin.Context) {
 	query := c.DefaultQuery("q", "ABBA")
@@ -150,9 +153,8 @@ func search(c *gin.Context) {
 		c.String(http.StatusNotFound, err.Error())
 	}
 	resString := handleSearchResults(results)
-	endpoint = "/user"
+	// endpoint = "/user"
 	c.String(http.StatusOK, resString)
-	return
 }
 func analyze(c *gin.Context) {
 	query := c.DefaultQuery("q", "ABBA")
@@ -167,7 +169,7 @@ func analyze(c *gin.Context) {
 	}
 	resString := handleAudioFeatures(results)
 
-	endpoint = "/user"
+	// endpoint = "/user"
 	c.String(http.StatusOK, resString)
 }
 
@@ -176,34 +178,47 @@ func analyze(c *gin.Context) {
    r and c are just to redirect to /auth
 */
 func setClient(endpoint string, c *gin.Context, r *gin.Engine) {
-	// var tok *oauth2.Token
+	var err error
 	if gclient, foundClient := kaszka.Get("client"); foundClient {
 		log.Println("Found cached client")
 		client = gclient.(spotify.Client)
 	} else {
+		var tok *oauth2.Token
 		log.Println("No cached client found. Looking for token in order to create Spotify client.")
 		if gtoken, foundToken := kaszka.Get("token"); foundToken {
 			log.Println("Found cached token")
-			tok := gtoken.(*oauth2.Token)
-			client = auth.NewClient(tok)
+			tok = gtoken.(*oauth2.Token)
 		} else {
 			log.Println("No cached token found. Looking for token saved in file token.json")
-			tok, err := tokenFromFile("./token.json")
+			tok, err = tokenFromFile("./token.json")
 			if err != nil {
-				log.Println("Not found token. Authenticating first")
+				log.Println("Not found token.json. Authenticating first")
 				c.Request.URL.Path = "/auth"
 				r.HandleContext(c)
+				return
 			}
-			log.Printf("%v", *tok)
-			client = auth.NewClient(tok)
-			kaszka.Set("token", tok, cache.DefaultExpiration)
-			log.Println("Token cached")
 		}
-		kaszka.Set("client", client, cache.DefaultExpiration)
+		// log.Printf("%v", *tok)
+		log.Printf("Token will expire in %s", tok.Expiry.Sub(time.Now()).String())
+		if tok.Expiry.Before(time.Now()) { // expired so let's update it
+			log.Println("Token expired. Authenticating first")
+			c.Request.URL.Path = "/auth"
+			r.HandleContext(c)
+			return
+		}
+		client = auth.NewClient(tok)
+		kaszka.Set("client", client, tok.Expiry.Sub(time.Now()))
 		log.Println("Client cached")
 	}
 	return
 }
+
+// func reauth(c *gin.Context) {
+// 	url := fmt.Sprintf("http://%s%s", c.Request.Host, "/auth")
+// 	log.Printf("callback: redirecting to endpoint %s", url)
+// 	// both approaches work but 2nd isn't rewriting url
+// 	c.Redirect(http.StatusMovedPermanently, url)
+// }
 
 // Retrieves a token from a local JSON file.
 // https://developers.google.com/tasks/quickstart/go
