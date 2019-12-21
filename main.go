@@ -31,25 +31,28 @@ var (
 	redirectURI = os.Getenv("REDIRECT_URI")
 	auth        = spotify.NewAuthenticator(redirectURI, spotify.ScopeUserReadPrivate)
 	client      spotify.Client
+	router      *gin.Engine
 	state       = "abc123"
 	endpoint    = "/user"
 )
 
-func main() {}
+func main() {
+
+}
 
 func init() {
 	// first start an HTTP server
-	r := gin.New()
+	router = gin.Default()
 
-	r.Use(favicon.New("./favicon.png"))
-	r.GET("/", func(c *gin.Context) {
+	router.Use(favicon.New("./favicon.png"))
+	router.GET("/", func(c *gin.Context) {
 		c.String(http.StatusOK, "Hello World! This is go-spotify here.")
 	})
-	r.GET("/ping", func(c *gin.Context) {
+	router.GET("/ping", func(c *gin.Context) {
 		c.String(http.StatusOK, "pong")
 	})
-	r.GET("/user", func(c *gin.Context) {
-		setClient(endpoint, c, r)
+	router.GET("/user", func(c *gin.Context) {
+		setClient(endpoint, c, router)
 		user, err := client.CurrentUser()
 		if err != nil {
 			log.Println(err.Error())
@@ -58,19 +61,19 @@ func init() {
 			c.String(http.StatusOK, fmt.Sprintln("Man, you are", user.ID))
 		}
 	})
-	r.GET("/auth", func(c *gin.Context) {
+	router.GET("/auth", func(c *gin.Context) {
 		url := auth.AuthURL(state)
 		log.Println("Please log in to Spotify by visiting the following page in your browser:", url)
 		c.Redirect(http.StatusMovedPermanently, url)
 	})
-	r.GET("/callback", callback)
-	r.GET("/top", top)
-	r.GET("/search", search)
-	r.GET("/analyze", analyze)
-	r.Run() // listen and serve on 0.0.0.0:8080
+	router.GET("/callback", callback)
+	router.GET("/top", top)
+	router.GET("/search", search)
+	router.GET("/analyze", analyze)
+	router.Run() // listen and serve on 0.0.0.0:8080
 	// For Google AppEngine
 	// Handle all requests using net/http
-	http.Handle("/", r)
+	http.Handle("/", router)
 }
 
 /* callback -
@@ -99,7 +102,7 @@ func callback(c *gin.Context) {
 	// defer redirect until finish otherwise we are looping ...
 	defer c.Redirect(http.StatusMovedPermanently, url)
 	// c.Request.URL.Path = endpoint
-	// r.HandleContext(c)
+	// router.HandleContext(c)
 	return
 }
 
@@ -107,7 +110,7 @@ func callback(c *gin.Context) {
  */
 func top(c *gin.Context) {
 	endpoint = "/top"
-	setClient(endpoint, c, r)
+	setClient(endpoint, c, router)
 	top, err := client.CurrentUsersPlaylists()
 	if err != nil {
 		log.Println(err.Error())
@@ -130,7 +133,7 @@ func search(c *gin.Context) {
 	query := c.DefaultQuery("q", "ABBA")
 	searchCategory := c.DefaultQuery("c", "track")
 	endpoint = fmt.Sprintf("/search?q=%s&c=%s", query, searchCategory)
-	setClient(endpoint, c, r)
+	setClient(endpoint, c, router)
 	searchType := searchType(searchCategory)
 	results, err := client.Search(query, searchType)
 	if err != nil {
@@ -146,7 +149,7 @@ func analyze(c *gin.Context) {
 	query := c.DefaultQuery("q", "ABBA")
 	searchCategory := c.DefaultQuery("c", "track")
 	endpoint = fmt.Sprintf("/analyze?q=%s&c=%s", query, searchCategory)
-	setClient(endpoint, c, r)
+	setClient(endpoint, c, router)
 	searchType := searchType(searchCategory)
 	results, err := client.Search(query, searchType)
 	if err != nil {
