@@ -19,11 +19,14 @@ import (
 like 403 lack of scope
 */
 
-// const (
-// )
+const (
+	maxLists  = 5
+	maxTracks = 5
+)
+
 var (
 	kaszka        = cache.New(60*time.Minute, 1*time.Minute)
-	auth          = spotify.NewAuthenticator(redirectURI, spotify.ScopeUserReadPrivate, spotify.ScopeUserTopRead)
+	auth          = spotify.NewAuthenticator(redirectURI, spotify.ScopeUserReadPrivate, spotify.ScopeUserTopRead, spotify.ScopeUserLibraryRead, spotify.ScopeUserFollowRead)
 	clientChannel = make(chan *spotify.Client)
 	redirectURI   = os.Getenv("REDIRECT_URI")
 )
@@ -40,7 +43,13 @@ func init() {
 	})
 	router.GET("/user", user)
 	router.GET("/top", top)
+	router.GET("/tracks", tracks)
+	router.GET("/playlists", playlists)
+	router.GET("/albums", albums)
+	router.GET("/artists", artists)
+
 	router.GET("/search", search)
+	router.GET("/analyze", analyze)
 	router.GET("/callback", callback)
 
 	router.Run(":8080")
@@ -84,7 +93,7 @@ func user(c *gin.Context) {
 	if client == nil { // get client from oauth
 		if d := c.DefaultQuery("deuce", "0"); d == "1" { // wait for auth to complete
 			client = <-clientChannel
-			log.Println("/user: Login Completed!")
+			log.Printf("%s: Login Completed!", endpoint)
 		} else { // redirect to auth URL and exit
 			url := auth.AuthURL(endpoint)
 			log.Printf("%s: redirecting to %s", endpoint, url)
@@ -100,7 +109,7 @@ func user(c *gin.Context) {
 		if err != nil {
 			log.Panic(err)
 		}
-		msg := fmt.Sprintf("You are logged in as: %s", user.ID)
+		msg := fmt.Sprintf("You are logged in as: %s", user.DisplayName)
 		c.String(http.StatusOK, msg)
 	}()
 }
@@ -115,7 +124,7 @@ func top(c *gin.Context) {
 	if client == nil { // get client from oauth
 		if d := c.DefaultQuery("deuce", "0"); d == "1" { // wait for auth to complete
 			client = <-clientChannel
-			log.Println("/user: Login Completed!")
+			log.Printf("%s: Login Completed!", endpoint)
 		} else { // redirect to auth URL and exit
 			url := auth.AuthURL(endpoint)
 			log.Printf("%s: redirecting to %s", endpoint, url)
@@ -145,6 +154,144 @@ func top(c *gin.Context) {
 		c.String(http.StatusOK, b.String())
 	}()
 }
+func tracks(c *gin.Context) {
+	endpoint := c.Request.URL.Path
+	client := getClient(endpoint)
+
+	if client == nil { // get client from oauth
+		if d := c.DefaultQuery("deuce", "0"); d == "1" { // wait for auth to complete
+			client = <-clientChannel
+			log.Printf("%s: Login Completed!", endpoint)
+		} else { // redirect to auth URL and exit
+			url := auth.AuthURL(endpoint)
+			log.Printf("%s: redirecting to %s", endpoint, url)
+			// HTTP standard does not pass through HTTP headers on an 302/301 directive
+			// 303 is never cached and always is GET
+			c.Redirect(303, url)
+			return
+		}
+	}
+	defer func() {
+		// use the client to make calls that require authorization
+		tracks, err := client.CurrentUsersTracks()
+		if err != nil {
+			log.Panic(err)
+			c.String(http.StatusNotFound, err.Error())
+		}
+		var b strings.Builder
+		b.WriteString("Tracks :")
+		for _, item := range tracks.Tracks {
+			b.WriteString("\n- ")
+			b.WriteString(item.Name)
+			b.WriteString(" [ ")
+			b.WriteString(item.Album.Name)
+			b.WriteString(" ] --  ")
+			b.WriteString(item.Artists[0].Name)
+		}
+		c.String(http.StatusOK, b.String())
+	}()
+}
+func playlists(c *gin.Context) {
+	endpoint := c.Request.URL.Path
+	client := getClient(endpoint)
+
+	if client == nil { // get client from oauth
+		if d := c.DefaultQuery("deuce", "0"); d == "1" { // wait for auth to complete
+			client = <-clientChannel
+			log.Printf("%s: Login Completed!", endpoint)
+		} else { // redirect to auth URL and exit
+			url := auth.AuthURL(endpoint)
+			log.Printf("%s: redirecting to %s", endpoint, url)
+			// HTTP standard does not pass through HTTP headers on an 302/301 directive
+			// 303 is never cached and always is GET
+			c.Redirect(303, url)
+			return
+		}
+	}
+	defer func() {
+		// use the client to make calls that require authorization
+		playlists, err := client.CurrentUsersPlaylists()
+		if err != nil {
+			log.Panic(err)
+			c.String(http.StatusNotFound, err.Error())
+		}
+		var b strings.Builder
+		b.WriteString("Playlists:")
+		for _, item := range playlists.Playlists {
+			b.WriteString("\n- ")
+			b.WriteString(item.Name)
+		}
+		c.String(http.StatusOK, b.String())
+	}()
+}
+func albums(c *gin.Context) {
+	endpoint := c.Request.URL.Path
+	client := getClient(endpoint)
+
+	if client == nil { // get client from oauth
+		if d := c.DefaultQuery("deuce", "0"); d == "1" { // wait for auth to complete
+			client = <-clientChannel
+			log.Printf("%s: Login Completed!", endpoint)
+		} else { // redirect to auth URL and exit
+			url := auth.AuthURL(endpoint)
+			log.Printf("%s: redirecting to %s", endpoint, url)
+			// HTTP standard does not pass through HTTP headers on an 302/301 directive
+			// 303 is never cached and always is GET
+			c.Redirect(303, url)
+			return
+		}
+	}
+	defer func() {
+		// use the client to make calls that require authorization
+		albums, err := client.CurrentUsersAlbums()
+		if err != nil {
+			log.Panic(err)
+			c.String(http.StatusNotFound, err.Error())
+		}
+		var b strings.Builder
+		b.WriteString("Albums:")
+		for _, item := range albums.Albums {
+			b.WriteString("\n- ")
+			b.WriteString(item.Name)
+			b.WriteString(" --  ")
+			b.WriteString(item.Artists[0].Name)
+		}
+		c.String(http.StatusOK, b.String())
+	}()
+}
+func artists(c *gin.Context) {
+	endpoint := c.Request.URL.Path
+	client := getClient(endpoint)
+
+	if client == nil { // get client from oauth
+		if d := c.DefaultQuery("deuce", "0"); d == "1" { // wait for auth to complete
+			client = <-clientChannel
+			log.Printf("%s: Login Completed!", endpoint)
+		} else { // redirect to auth URL and exit
+			url := auth.AuthURL(endpoint)
+			log.Printf("%s: redirecting to %s", endpoint, url)
+			// HTTP standard does not pass through HTTP headers on an 302/301 directive
+			// 303 is never cached and always is GET
+			c.Redirect(303, url)
+			return
+		}
+	}
+	defer func() {
+		// use the client to make calls that require authorization
+		artists, err := client.CurrentUsersFollowedArtists()
+		if err != nil {
+			log.Panic(err)
+			c.String(http.StatusNotFound, err.Error())
+		}
+		var b strings.Builder
+		b.WriteString("Artists:")
+		for _, item := range artists.Artists {
+			b.WriteString("\n- ")
+			b.WriteString(item.Name)
+		}
+		c.String(http.StatusOK, b.String())
+	}()
+}
 
 /* search - searches playlists, albums, tracks etc.
  */
@@ -155,7 +302,7 @@ func search(c *gin.Context) {
 	if client == nil { // get client from oauth
 		if d := c.DefaultQuery("deuce", "0"); d == "1" { // wait for auth to complete
 			client = <-clientChannel
-			log.Println("/search: Login Completed!")
+			log.Printf("%s: Login Completed!", endpoint)
 			// Edge case = WHAT TODO?
 			// - redirects erase search params
 			c.String(http.StatusOK, "Fix this edge case for /search")
@@ -179,6 +326,41 @@ func search(c *gin.Context) {
 			return
 		}
 		resString := handleSearchResults(results)
+		c.String(http.StatusOK, resString)
+	}()
+}
+
+func analyze(c *gin.Context) {
+	endpoint := c.Request.URL.Path
+	client := getClient(endpoint)
+
+	if client == nil { // get client from oauth
+		if d := c.DefaultQuery("deuce", "0"); d == "1" { // wait for auth to complete
+			client = <-clientChannel
+			log.Printf("%s: Login Completed!", endpoint)
+			// Edge case = WHAT TODO?
+			// - redirects erase search params
+			c.String(http.StatusOK, "Fix this edge case for /search")
+		} else { // redirect to auth URL and exit
+			url := auth.AuthURL(endpoint)
+			log.Printf("%s: redirecting to %s", endpoint, url)
+			// HTTP standard does not pass through HTTP headers on an 302/301 directive
+			// 303 is never cached and always is GET
+			c.Redirect(303, url)
+			return
+		}
+	}
+	defer func() {
+		query := c.DefaultQuery("q", "ABBA")
+		searchCategory := c.DefaultQuery("c", "track")
+		searchType := searchType(searchCategory)
+		results, err := client.Search(query, searchType)
+		if err != nil {
+			log.Println(err.Error())
+			c.String(http.StatusNotFound, err.Error())
+			return
+		}
+		resString := handleAudioFeatures(results, client)
 		c.String(http.StatusOK, resString)
 	}()
 }
@@ -247,4 +429,55 @@ func searchType(a string) spotify.SearchType {
 	default:
 		return spotify.SearchTypeTrack
 	}
+}
+
+func handleAudioFeatures(results *spotify.SearchResult, client *spotify.Client) string {
+	var b strings.Builder
+
+	b.WriteString("Analysis:\n")
+	b.WriteString("Energy, Valence, Loud, Tempo, Acoustic, Instrumental, Dance, Speach\n")
+	if results.Tracks != nil {
+		tracks := results.Tracks.Tracks
+		var tr []spotify.ID
+		for _, item := range tracks {
+			b.WriteString(fmt.Sprintf(" - %s - %s:\n", item.Name, item.Artists[0].Name))
+			tr = append(tr, item.ID)
+		}
+		// using multiple track.IDs at once saves us many, many calls to Spotify
+		audioFeatures, _ := client.GetAudioFeatures(tr...) // GetAudioFeatures has variadic argument
+		for _, res := range audioFeatures {
+			b.WriteString(fmt.Sprintf("  %.4f | %.4f | %.4f | %.4f |", res.Energy, res.Valence, res.Loudness, res.Tempo))
+			b.WriteString(fmt.Sprintf(" %.4f | %.4f |", res.Acousticness, res.Instrumentalness))
+			b.WriteString(fmt.Sprintf(" %.4f | %.4f |", res.Danceability, res.Speechiness))
+			b.WriteString("\n")
+			// b.WriteString(fmt.Sprintf("\n%v\n%v\n", res.AnalysisURL, res.TrackURL))
+		}
+	}
+	if results.Playlists != nil {
+		playlists := results.Playlists.Playlists
+		for i, pl := range playlists {
+			if i >= maxLists {
+				break
+			}
+			playlist, _ := client.GetPlaylist(pl.ID)
+			b.WriteString(fmt.Sprintf("\n  %s - %s\n", playlist.Name, playlist.Description))
+			var tr []spotify.ID
+			for j, item := range playlist.Tracks.Tracks {
+				if j >= maxTracks {
+					break
+				}
+				b.WriteString(fmt.Sprintf(" - %s - %s:\n", item.Track.Name, item.Track.Artists[0].Name))
+				tr = append(tr, item.Track.ID)
+			}
+			// using multiple track.IDs at once saves us many, many calls to Spotify
+			audioFeatures, _ := client.GetAudioFeatures(tr...) // GetAudioFeatures has variadic argument
+			for _, res := range audioFeatures {
+				b.WriteString(fmt.Sprintf("  %.4f | %.4f | %.4f | %.4f |", res.Energy, res.Valence, res.Loudness, res.Tempo))
+				b.WriteString(fmt.Sprintf(" %.4f | %.4f |", res.Acousticness, res.Instrumentalness))
+				b.WriteString(fmt.Sprintf(" %.4f | %.4f |", res.Danceability, res.Speechiness))
+				b.WriteString("\n")
+			}
+		}
+	}
+	return b.String()
 }
