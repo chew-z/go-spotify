@@ -7,3 +7,5 @@ token.json
 *.bak
 *.bak.go
 spotify.txt
+auth-gin.go
+auth-gin-cache.go

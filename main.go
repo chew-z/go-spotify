@@ -28,11 +28,10 @@ var (
 	redirectURI   = os.Getenv("REDIRECT_URI")
 )
 
-func init() {
+func main() {
 }
 
-func main() {
-
+func init() {
 	router := gin.Default()
 	router.Use(favicon.New("./favicon.png"))
 

@@ -7,9 +7,9 @@ manual_scaling:
   instances: 1
 # Trick #2 - downgrade default resources
 resources:
-  cpu: 1
-  memory_gb: 0.6
-  disk_size_gb: 10
+  # cpu: 1
+  # memory_gb: 0.6
+  # disk_size_gb: 10
 # Trick #3
 # gcloud app deploy --version dev
 # when done testing SWITCH OFF
