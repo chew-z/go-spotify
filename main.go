@@ -1,10 +1,7 @@
 package main
 
 import (
-	"encoding/json"
-	"errors"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -15,342 +12,196 @@ import (
 	"github.com/patrickmn/go-cache"
 	"github.com/thinkerou/favicon"
 	"github.com/zmb3/spotify"
-	"golang.org/x/oauth2"
 )
 
-const (
-	maxLists  = 5
-	maxTracks = 5
-)
+/* TODO
+-- gracefull handling of zmb3/spotify errors
+like 403 lack of scope
+*/
 
+// const (
+// )
 var (
-	// Create a cache with a default expiration time of 15 minutes
-	kaszka      = cache.New(15*time.Minute, 1*time.Minute)
-	redirectURI = os.Getenv("REDIRECT_URI")
-	// client      spotify.Client
-	router   *gin.Engine
-	state    = "abc123"
-	endpoint = "/whoami"
+	kaszka        = cache.New(60*time.Minute, 1*time.Minute)
+	auth          = spotify.NewAuthenticator(redirectURI, spotify.ScopeUserReadPrivate, spotify.ScopeUserTopRead)
+	clientChannel = make(chan *spotify.Client)
+	redirectURI   = os.Getenv("REDIRECT_URI")
 )
+
+func init() {
+}
 
 func main() {
 
-}
-
-func init() {
-	// first start an HTTP server
-	router = gin.Default()
-
+	router := gin.Default()
 	router.Use(favicon.New("./favicon.png"))
+
 	router.GET("/", func(c *gin.Context) {
-		c.String(http.StatusOK, "Hello World! This is go-spotify here.")
+		c.String(http.StatusOK, "Hello World! This is auth-gin-cache.go here.")
 	})
-	router.GET("/ping", func(c *gin.Context) {
-		c.String(http.StatusOK, "pong")
-	})
-	router.GET("/whoami", whoAmI)
-	router.GET("/login", authorize)
-	router.GET("/callback", callback)
+	router.GET("/user", user)
 	router.GET("/top", top)
-	router.GET("usertoptracks", userTopTracks)
 	router.GET("/search", search)
-	router.GET("/analyze", analyze)
-	router.GET("/reset", reset)
+	router.GET("/callback", callback)
 
-	router.Run() // listen and serve on 0.0.0.0:8080
-	// For Google AppEngine
-	// Handle all requests using net/http
-	http.Handle("/", router)
+	router.Run(":8080")
 }
 
-func whoAmI(c *gin.Context) {
-	client, clientError := getClient()
-	if clientError != nil {
-		log.Println(clientError.Error())
-		// url := fmt.Sprintf("http://%s%s", c.Request.Host, "/login")
-		// log.Printf("callback: redirecting to endpoint %s", url)
-		// // both approaches work but 2nd isn't rewriting url
-		// // defer redirect until finish otherwise we are looping ...
-		// defer c.Redirect(http.StatusMovedPermanently, url)
-		authorize(c)
-		return
-	}
-
-	user, err := client.CurrentUser() //if client is not declared panic and chaos ensues
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-	c.String(http.StatusOK, fmt.Sprintln("Man, you are", user.ID))
-}
-
-func authorize(c *gin.Context) {
-	kaszka.Delete("token")
-	kaszka.Delete("client")
-	auth := spotify.NewAuthenticator(redirectURI, spotify.ScopeUserReadPrivate, spotify.ScopeUserTopRead)
-	auth.SetAuthInfo(os.Getenv("SPOTIFY_ID"), os.Getenv("SPOTIFY_SECRET"))
-	authURL := auth.AuthURL(state)
-	log.Println("Auth URL:", authURL)
-	defer c.Redirect(http.StatusMovedPermanently, authURL)
-}
-
-/* callback -
- */
-func callback(c *gin.Context) {
-	auth := spotify.NewAuthenticator(redirectURI, spotify.ScopeUserReadPrivate)
-	auth.SetAuthInfo(os.Getenv("SPOTIFY_ID"), os.Getenv("SPOTIFY_SECRET"))
-	tok, err := auth.Token(state, c.Request)
-	if err != nil {
-		log.Fatal(err.Error())
-		c.String(http.StatusForbidden, "Couldn't get token")
-	}
-	if st := c.Query("state"); st != state {
-		log.Fatalf("State mismatch: %s != %s\n", st, state)
-		c.String(http.StatusNotFound, "State mismatch")
-	}
-	jsonToken, jsonErr := json.MarshalIndent(tok, "    ", "    ")
-	if jsonErr != nil {
-		log.Println(jsonErr.Error())
-	}
-	_ = ioutil.WriteFile("token.json", jsonToken, 0600)
-	// log.Printf("callback: Token saved to file\n%s", string(jsonToken))
-	kaszka.Set("token", tok, tok.Expiry.Sub(time.Now()))
-	log.Println("callback: Token cached")
-	// client = auth.NewClient(tok)
-	url := fmt.Sprintf("http://%s%s", c.Request.Host, endpoint)
-	log.Printf("callback: redirecting to endpoint %s", url)
-	// both approaches work but 2nd isn't rewriting url
-	// defer redirect until finish otherwise we are looping ...
-	defer c.Redirect(http.StatusMovedPermanently, url)
-	// c.Request.URL.Path = endpoint
-	// router.HandleContext(c)
-}
-
-/* getClient - gets token from cache or file or if not present
-   authorize app and return to the calling endpoint
-   r and c are just to redirect to /auth
+/* statefull authorization handler using channels
+state = calling endpoint (which is intended use of scope)
+caches client for as long as token is valid (1 hour for spotify)
+no persistent storing of token, there is no need?
+spotify stores persisten cookies behind our back so it is enough?
 */
-func getClient() (*spotify.Client, error) {
-	var tok *oauth2.Token
-	var err error
-	if gclient, foundClient := kaszka.Get("client"); foundClient {
-		log.Println("Found cached client")
-		client := gclient.(*spotify.Client)
-		return client, nil
+func callback(c *gin.Context) {
+	endpoint := c.Request.FormValue("state")
+	log.Printf("/callback: endpoint: %s", endpoint)
+	// Now we need different token for each endpoint = state. Sucks big way!
+	tok, err := auth.Token(endpoint, c.Request)
+	if err != nil {
+		c.String(http.StatusForbidden, "Couldn't get token")
+		log.Panic(err)
 	}
-	// if client is not cached
-	log.Println("No cached client found. Looking for token in order to create Spotify client.")
-	if gtoken, foundToken := kaszka.Get("token"); foundToken {
-		log.Println("Found cached token")
-		tok = gtoken.(*oauth2.Token)
-	} else {
-		log.Println("No cached token found. Looking for token saved in file token.json")
-		tok, err = tokenFromFile("./token.json")
-		if err != nil {
-			log.Println("Not found token.json. Authenticating first")
-			return nil, errors.New("Not found token.json. Authenticating first")
+	// create copy of gin.Context to be used inside the goroutine
+	// cCopy := c.Copy()
+	go func() {
+		client := auth.NewClient(tok)
+		log.Println("/callback: Login Completed!")
+		kaszka.Set(endpoint, &client, tok.Expiry.Sub(time.Now()))
+		log.Printf("/callback: Cached client for: %s", endpoint)
+		clientChannel <- &client
+	}()
+	url := fmt.Sprintf("http://%s%s?deuce=1", c.Request.Host, endpoint)
+	defer c.Redirect(303, url)
+	log.Printf("/callback: redirecting to endpoint %s", url)
+}
+
+/*
+ */
+func user(c *gin.Context) {
+	endpoint := c.Request.URL.Path
+	client := getClient(endpoint)
+
+	if client == nil { // get client from oauth
+		if d := c.DefaultQuery("deuce", "0"); d == "1" { // wait for auth to complete
+			client = <-clientChannel
+			log.Println("/user: Login Completed!")
+		} else { // redirect to auth URL and exit
+			url := auth.AuthURL(endpoint)
+			log.Printf("%s: redirecting to %s", endpoint, url)
+			// HTTP standard does not pass through HTTP headers on an 302/301 directive
+			// 303 is never cached and always is GET
+			c.Redirect(303, url)
+			return
 		}
 	}
-	// log.Printf("%v", *tok)
-	log.Printf("Token will expire in %s", tok.Expiry.Sub(time.Now()).String())
-	if tok.Expiry.Before(time.Now()) { // expired so let's update it
-		log.Println("Token expired. Authenticating first")
-		return nil, errors.New("Token expired. Authenticating first")
-	}
-	auth := spotify.NewAuthenticator(redirectURI, spotify.ScopeUserReadPrivate)
-	auth.SetAuthInfo(os.Getenv("SPOTIFY_ID"), os.Getenv("SPOTIFY_SECRET"))
-	client := auth.NewClient(tok)
-	kaszka.Set("client", &client, tok.Expiry.Sub(time.Now()))
-	log.Println("Client cached")
-	return &client, nil
+	defer func() {
+		// use the client to make calls that require authorization
+		user, err := client.CurrentUser()
+		if err != nil {
+			log.Panic(err)
+		}
+		msg := fmt.Sprintf("You are logged in as: %s", user.ID)
+		c.String(http.StatusOK, msg)
+	}()
 }
 
-func reset(c *gin.Context) {
-	kaszka.Delete("token")
-	kaszka.Delete("client")
-	_ = ioutil.WriteFile("token.json", []byte(""), 0600)
-
-	c.String(http.StatusOK, "Reseted")
-}
-
-/* top -
- */
+/* top - prints user top tracks (sensible defaults)
+read zmb3/spotify code to learn more
+*/
 func top(c *gin.Context) {
-	endpoint = "/top"
-	client, clientError := getClient()
-	if clientError != nil {
-		log.Println(clientError.Error())
-		authorize(c)
-		// url := fmt.Sprintf("http://%s%s", c.Request.Host, "/login")
-		// log.Printf("callback: redirecting to endpoint %s", url)
-		// // both approaches work but 2nd isn't rewriting url
-		// // defer redirect until finish otherwise we are looping ...
-		// defer c.Redirect(http.StatusMovedPermanently, url)
-		return
+	endpoint := c.Request.URL.Path
+	client := getClient(endpoint)
+
+	if client == nil { // get client from oauth
+		if d := c.DefaultQuery("deuce", "0"); d == "1" { // wait for auth to complete
+			client = <-clientChannel
+			log.Println("/user: Login Completed!")
+		} else { // redirect to auth URL and exit
+			url := auth.AuthURL(endpoint)
+			log.Printf("%s: redirecting to %s", endpoint, url)
+			// HTTP standard does not pass through HTTP headers on an 302/301 directive
+			// 303 is never cached and always is GET
+			c.Redirect(303, url)
+			return
+		}
 	}
-	top, err := client.CurrentUsersTopTracks()
-	if err != nil {
-		log.Println(err.Error())
-		c.String(http.StatusNotFound, err.Error())
-	} else {
+	defer func() {
+		// use the client to make calls that require authorization
+		top, err := client.CurrentUsersTopTracks()
+		if err != nil {
+			log.Panic(err)
+			c.String(http.StatusNotFound, err.Error())
+		}
 		var b strings.Builder
 		b.WriteString("Top :")
 		for _, item := range top.Tracks {
 			b.WriteString("\n- ")
 			b.WriteString(item.Name)
-			// b.WriteString(" : ")
-			// b.WriteString(item.Owner.ID)
+			b.WriteString(" [ ")
+			b.WriteString(item.Album.Name)
+			b.WriteString(" ] --  ")
+			b.WriteString(item.Artists[0].Name)
 		}
-		// endpoint = "/user"
 		c.String(http.StatusOK, b.String())
-	}
-}
-func userTopTracks(c *gin.Context) {
-	endpoint = "/usertoptracks"
-	client, clientError := getClient()
-	if clientError != nil {
-		log.Println(clientError.Error())
-		// url := fmt.Sprintf("http://%s%s", c.Request.Host, "/login")
-		// log.Printf("callback: redirecting to endpoint %s", url)
-		// // both approaches work but 2nd isn't rewriting url
-		// // defer redirect until finish otherwise we are looping ...
-		// defer c.Redirect(http.StatusMovedPermanently, url)
-		authorize(c)
-		return
-	}
-
-	data, err := client.CurrentUsersTopTracks()
-	if err != nil {
-		log.Println(err.Error())
-		c.String(http.StatusForbidden, err.Error())
-	} else {
-		c.JSON(http.StatusOK, data)
-	}
+	}()
 }
 
+/* search - searches playlists, albums, tracks etc.
+ */
 func search(c *gin.Context) {
-	query := c.DefaultQuery("q", "ABBA")
-	searchCategory := c.DefaultQuery("c", "track")
-	endpoint = fmt.Sprintf("/search?q=%s&c=%s", query, searchCategory)
-	client, clientError := getClient()
-	if clientError != nil {
-		log.Println(clientError.Error())
-		// url := fmt.Sprintf("http://%s%s", c.Request.Host, "/login")
-		// log.Printf("callback: redirecting to endpoint %s", url)
-		// // both approaches work but 2nd isn't rewriting url
-		// // defer redirect until finish otherwise we are looping ...
-		// defer c.Redirect(http.StatusMovedPermanently, url)
-		authorize(c)
-		return
-	}
+	endpoint := c.Request.URL.Path
+	client := getClient(endpoint)
 
-	searchType := searchType(searchCategory)
-	results, err := client.Search(query, searchType)
-	if err != nil {
-		log.Println(err.Error())
-		c.String(http.StatusNotFound, err.Error())
-	}
-	resString := handleSearchResults(results)
-	// endpoint = "/user"
-	c.String(http.StatusOK, resString)
-}
-func analyze(c *gin.Context) {
-	query := c.DefaultQuery("q", "ABBA")
-	searchCategory := c.DefaultQuery("c", "track")
-	endpoint = fmt.Sprintf("/analyze?q=%s&c=%s", query, searchCategory)
-	client, clientError := getClient()
-	if clientError != nil {
-		log.Println(clientError.Error())
-		// url := fmt.Sprintf("http://%s%s", c.Request.Host, "/login")
-		// log.Printf("callback: redirecting to endpoint %s", url)
-		// // both approaches work but 2nd isn't rewriting url
-		// // defer redirect until finish otherwise we are looping ...
-		// defer c.Redirect(http.StatusMovedPermanently, url)
-		authorize(c)
-		return
-	}
-
-	searchType := searchType(searchCategory)
-	results, err := client.Search(query, searchType)
-	if err != nil {
-		log.Println(err.Error())
-		c.String(http.StatusNotFound, err.Error())
-	}
-	resString := handleAudioFeatures(results)
-
-	// endpoint = "/user"
-	c.String(http.StatusOK, resString)
-}
-
-// Retrieves a token from a local JSON file.
-// https://developers.google.com/tasks/quickstart/go
-func tokenFromFile(file string) (*oauth2.Token, error) {
-	f, err := os.Open(file)
-	defer f.Close()
-	if err != nil {
-		return nil, err
-	}
-	tok := &oauth2.Token{}
-	err = json.NewDecoder(f).Decode(tok)
-	return tok, err
-}
-
-func handleAudioFeatures(results *spotify.SearchResult) string {
-	var b strings.Builder
-	client, clientError := getClient()
-	if clientError != nil {
-		log.Println(clientError.Error())
-		return ""
-	}
-
-	b.WriteString("Analysis:\n")
-	b.WriteString("Energy, Valence, Loud, Tempo, Acoustic, Instrumental, Dance, Speach\n")
-	if results.Tracks != nil {
-		tracks := results.Tracks.Tracks
-		var tr []spotify.ID
-		for _, item := range tracks {
-			b.WriteString(fmt.Sprintf(" - %s - %s:\n", item.Name, item.Artists[0].Name))
-			tr = append(tr, item.ID)
-		}
-		audioFeatures, _ := client.GetAudioFeatures(tr...) // GetAudioFeatures has variadic argument
-		for _, res := range audioFeatures {
-			b.WriteString(fmt.Sprintf("  %.4f | %.4f | %.4f | %.4f |", res.Energy, res.Valence, res.Loudness, res.Tempo))
-			// b.WriteString(fmt.Sprintf(" %.4f | %.4f |", res.Acousticness, res.Instrumentalness))
-			// b.WriteString(fmt.Sprintf(" %.4f | %.4f |", res.Danceability, res.Speechiness))
-			b.WriteString("\n")
-			// b.WriteString(fmt.Sprintf("\n%v\n%v\n", res.AnalysisURL, res.TrackURL))
+	if client == nil { // get client from oauth
+		if d := c.DefaultQuery("deuce", "0"); d == "1" { // wait for auth to complete
+			client = <-clientChannel
+			log.Println("/search: Login Completed!")
+			// Edge case = WHAT TODO?
+			// - redirects erase search params
+			c.String(http.StatusOK, "Fix this edge case for /search")
+		} else { // redirect to auth URL and exit
+			url := auth.AuthURL(endpoint)
+			log.Printf("%s: redirecting to %s", endpoint, url)
+			// HTTP standard does not pass through HTTP headers on an 302/301 directive
+			// 303 is never cached and always is GET
+			c.Redirect(303, url)
+			return
 		}
 	}
-	if results.Playlists != nil {
-		playlists := results.Playlists.Playlists
-		for i, pl := range playlists {
-			if i >= maxLists {
-				break
-			}
-			// playlist, _ := client.GetPlaylist(pl.Owner.ID, pl.ID)
-			playlist, _ := client.GetPlaylist(pl.ID)
-			b.WriteString(fmt.Sprintf("\n  %s - %s\n", playlist.Name, playlist.Description))
-			var tr []spotify.ID
-			for j, item := range playlist.Tracks.Tracks {
-				if j >= maxTracks {
-					break
-				}
-				b.WriteString(fmt.Sprintf(" - %s - %s:\n", item.Track.Name, item.Track.Artists[0].Name))
-				tr = append(tr, item.Track.ID)
-			}
-			// using multiple track.IDs at once saves us many, many calls to Spotify
-			audioFeatures, _ := client.GetAudioFeatures(tr...) // GetAudioFeatures has variadic argument
-			for _, res := range audioFeatures {
-				b.WriteString(fmt.Sprintf("  %.4f | %.4f | %.4f | %.4f |", res.Energy, res.Valence, res.Loudness, res.Tempo))
-				// b.WriteString(fmt.Sprintf(" %.4f | %.4f |", res.Acousticness, res.Instrumentalness))
-				// b.WriteString(fmt.Sprintf(" %.4f | %.4f |", res.Danceability, res.Speechiness))
-				b.WriteString("\n")
-			}
+	defer func() {
+		query := c.DefaultQuery("q", "ABBA")
+		searchCategory := c.DefaultQuery("c", "track")
+		searchType := searchType(searchCategory)
+		results, err := client.Search(query, searchType)
+		if err != nil {
+			log.Println(err.Error())
+			c.String(http.StatusNotFound, err.Error())
+			return
 		}
-	}
-	return b.String()
+		resString := handleSearchResults(results)
+		c.String(http.StatusOK, resString)
+	}()
 }
 
+/* getClient - restore client for given state from cache
+or return nil
+*/
+func getClient(endpoint string) *spotify.Client {
+	if gclient, foundClient := kaszka.Get(endpoint); foundClient {
+		log.Printf("Cached client found for: %s", endpoint)
+		client := gclient.(*spotify.Client)
+		if tok, err := client.Token(); err != nil {
+			log.Panic(err)
+		} else {
+			log.Printf("Token will expire in %s", tok.Expiry.Sub(time.Now()).String())
+		}
+		return client
+	}
+	msg := fmt.Sprintf("No cached client found for: %s", endpoint)
+	log.Println(msg)
+	return nil
+}
 func handleSearchResults(results *spotify.SearchResult) string {
 	var b strings.Builder
 	// handle album results
