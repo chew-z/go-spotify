@@ -16,7 +16,7 @@ import (
 
 /* TODO
 -- gracefull handling of zmb3/spotify errors
-like 403 lack of scope
+like 403 lack of scope, unexpected endpoint etc.
 */
 
 const (
@@ -39,7 +39,7 @@ func init() {
 	router.Use(favicon.New("./favicon.png"))
 
 	router.GET("/", func(c *gin.Context) {
-		c.String(http.StatusOK, "Hello World! This is auth-gin-cache.go here.")
+		c.String(http.StatusOK, "Hello World! This is go-spotify here.")
 	})
 	router.GET("/user", user)
 	router.GET("/top", top)
@@ -50,6 +50,7 @@ func init() {
 
 	router.GET("/search", search)
 	router.GET("/analyze", analyze)
+
 	router.GET("/callback", callback)
 
 	router.Run(":8080")
@@ -79,7 +80,8 @@ func callback(c *gin.Context) {
 		log.Printf("/callback: Cached client for: %s", endpoint)
 		clientChannel <- &client
 	}()
-	url := fmt.Sprintf("http://%s%s?deuce=1", c.Request.Host, endpoint)
+	c.SetCookie("deuce", "1", 1, endpoint, "", false, true)
+	url := fmt.Sprintf("http://%s%s", c.Request.Host, endpoint)
 	defer c.Redirect(303, url)
 	log.Printf("/callback: redirecting to endpoint %s", url)
 }
@@ -88,10 +90,13 @@ func callback(c *gin.Context) {
  */
 func user(c *gin.Context) {
 	endpoint := c.Request.URL.Path
+	deuceCookie, _ := c.Cookie("deuce")
+	log.Printf("Deuce: %s ", deuceCookie)
 	client := getClient(endpoint)
 
 	if client == nil { // get client from oauth
-		if d := c.DefaultQuery("deuce", "0"); d == "1" { // wait for auth to complete
+		// if d := c.DefaultQuery("deuce", "0"); d == "1" { // wait for auth to complete
+		if deuceCookie == "1" { // wait for auth to complete
 			client = <-clientChannel
 			log.Printf("%s: Login Completed!", endpoint)
 		} else { // redirect to auth URL and exit
@@ -119,10 +124,12 @@ read zmb3/spotify code to learn more
 */
 func top(c *gin.Context) {
 	endpoint := c.Request.URL.Path
+	deuceCookie, _ := c.Cookie("deuce")
+	log.Printf("Deuce: %s ", deuceCookie)
 	client := getClient(endpoint)
 
 	if client == nil { // get client from oauth
-		if d := c.DefaultQuery("deuce", "0"); d == "1" { // wait for auth to complete
+		if deuceCookie == "1" { // wait for auth to complete
 			client = <-clientChannel
 			log.Printf("%s: Login Completed!", endpoint)
 		} else { // redirect to auth URL and exit
@@ -156,10 +163,12 @@ func top(c *gin.Context) {
 }
 func tracks(c *gin.Context) {
 	endpoint := c.Request.URL.Path
+	deuceCookie, _ := c.Cookie("deuce")
+	log.Printf("Deuce: %s ", deuceCookie)
 	client := getClient(endpoint)
 
 	if client == nil { // get client from oauth
-		if d := c.DefaultQuery("deuce", "0"); d == "1" { // wait for auth to complete
+		if deuceCookie == "1" { // wait for auth to complete
 			client = <-clientChannel
 			log.Printf("%s: Login Completed!", endpoint)
 		} else { // redirect to auth URL and exit
@@ -193,10 +202,12 @@ func tracks(c *gin.Context) {
 }
 func playlists(c *gin.Context) {
 	endpoint := c.Request.URL.Path
+	deuceCookie, _ := c.Cookie("deuce")
+	log.Printf("Deuce: %s ", deuceCookie)
 	client := getClient(endpoint)
 
 	if client == nil { // get client from oauth
-		if d := c.DefaultQuery("deuce", "0"); d == "1" { // wait for auth to complete
+		if deuceCookie == "1" { // wait for auth to complete
 			client = <-clientChannel
 			log.Printf("%s: Login Completed!", endpoint)
 		} else { // redirect to auth URL and exit
@@ -226,10 +237,12 @@ func playlists(c *gin.Context) {
 }
 func albums(c *gin.Context) {
 	endpoint := c.Request.URL.Path
+	deuceCookie, _ := c.Cookie("deuce")
+	log.Printf("Deuce: %s ", deuceCookie)
 	client := getClient(endpoint)
 
 	if client == nil { // get client from oauth
-		if d := c.DefaultQuery("deuce", "0"); d == "1" { // wait for auth to complete
+		if deuceCookie == "1" { // wait for auth to complete
 			client = <-clientChannel
 			log.Printf("%s: Login Completed!", endpoint)
 		} else { // redirect to auth URL and exit
@@ -261,10 +274,12 @@ func albums(c *gin.Context) {
 }
 func artists(c *gin.Context) {
 	endpoint := c.Request.URL.Path
+	deuceCookie, _ := c.Cookie("deuce")
+	log.Printf("Deuce: %s ", deuceCookie)
 	client := getClient(endpoint)
 
 	if client == nil { // get client from oauth
-		if d := c.DefaultQuery("deuce", "0"); d == "1" { // wait for auth to complete
+		if deuceCookie == "1" { // wait for auth to complete
 			client = <-clientChannel
 			log.Printf("%s: Login Completed!", endpoint)
 		} else { // redirect to auth URL and exit
@@ -297,10 +312,21 @@ func artists(c *gin.Context) {
  */
 func search(c *gin.Context) {
 	endpoint := c.Request.URL.Path
+	deuceCookie, _ := c.Cookie("deuce")
+	log.Printf("Deuce: %s ", deuceCookie)
 	client := getClient(endpoint)
+	qCookie, cookieErr := c.Cookie("search_query")
+	cCookie, _ := c.Cookie("search_category")
+	if cookieErr != nil {
+		qCookie = "NotSet"
+		cCookie = "NotSet"
+		c.SetCookie("search_query", c.Query("q"), 1, endpoint, "", false, true)
+		c.SetCookie("search_category", c.Query("c"), 1, endpoint, "", false, true)
+	}
+	log.Printf("Cookie values: %s %s \n", qCookie, cCookie)
 
 	if client == nil { // get client from oauth
-		if d := c.DefaultQuery("deuce", "0"); d == "1" { // wait for auth to complete
+		if deuceCookie == "1" { // wait for auth to complete
 			client = <-clientChannel
 			log.Printf("%s: Login Completed!", endpoint)
 			// Edge case = WHAT TODO?
@@ -316,8 +342,8 @@ func search(c *gin.Context) {
 		}
 	}
 	defer func() {
-		query := c.DefaultQuery("q", "ABBA")
-		searchCategory := c.DefaultQuery("c", "track")
+		query := c.DefaultQuery("q", qCookie)
+		searchCategory := c.DefaultQuery("c", cCookie)
 		searchType := searchType(searchCategory)
 		results, err := client.Search(query, searchType)
 		if err != nil {
@@ -332,10 +358,21 @@ func search(c *gin.Context) {
 
 func analyze(c *gin.Context) {
 	endpoint := c.Request.URL.Path
+	deuceCookie, _ := c.Cookie("deuce")
+	log.Printf("Deuce: %s ", deuceCookie)
 	client := getClient(endpoint)
+	qCookie, cookieErr := c.Cookie("search_query")
+	cCookie, _ := c.Cookie("search_category")
+	if cookieErr != nil {
+		qCookie = "NotSet"
+		cCookie = "NotSet"
+		c.SetCookie("search_query", c.Query("q"), 1, endpoint, "", false, true)
+		c.SetCookie("search_category", c.Query("c"), 1, endpoint, "", false, true)
+	}
+	log.Printf("Cookie values: %s %s \n", qCookie, cCookie)
 
 	if client == nil { // get client from oauth
-		if d := c.DefaultQuery("deuce", "0"); d == "1" { // wait for auth to complete
+		if deuceCookie == "1" { // wait for auth to complete
 			client = <-clientChannel
 			log.Printf("%s: Login Completed!", endpoint)
 			// Edge case = WHAT TODO?
@@ -351,8 +388,8 @@ func analyze(c *gin.Context) {
 		}
 	}
 	defer func() {
-		query := c.DefaultQuery("q", "ABBA")
-		searchCategory := c.DefaultQuery("c", "track")
+		query := c.DefaultQuery("q", qCookie)
+		searchCategory := c.DefaultQuery("c", cCookie)
 		searchType := searchType(searchCategory)
 		results, err := client.Search(query, searchType)
 		if err != nil {
