@@ -53,6 +53,7 @@ func init() {
 
 	router.GET("/search", search)
 	router.GET("/analyze", analyze)
+	router.GET("/recommend", recommend)
 
 	router.GET("/callback", callback)
 
@@ -439,6 +440,59 @@ func analyze(c *gin.Context) {
 		}
 		resString := handleAudioFeatures(results, client)
 		c.String(http.StatusOK, resString)
+	}()
+}
+
+/*
+ */
+func recommend(c *gin.Context) {
+	endpoint := c.Request.URL.Path
+	client := getClient(endpoint)
+	deuceCookie, _ := c.Cookie("deuce")
+	log.Printf("Deuce: %s ", deuceCookie)
+	tCookie, cookieErr := c.Cookie("track_cookie")
+	if cookieErr != nil {
+		tCookie = "NotSet"
+		c.SetCookie("track_query", c.Query("t"), cookieLifetime, endpoint, "", false, true)
+	}
+	log.Printf("Cookie values: %s \n", tCookie)
+
+	if client == nil { // get client from oauth
+		if deuceCookie == "1" { // wait for auth to complete
+			client = <-clientChannel
+			log.Printf("%s: Login Completed!", endpoint)
+			// Edge case = WHAT TODO?
+			// - redirects erase search params
+			c.String(http.StatusOK, "Fix this edge case for /search")
+		} else { // redirect to auth URL and exit
+			url := auth.AuthURL(endpoint)
+			log.Printf("%s: redirecting to %s", endpoint, url)
+			// HTTP standard does not pass through HTTP headers on an 302/301 directive
+			// 303 is never cached and always is GET
+			c.Redirect(303, url)
+			return
+		}
+	}
+	defer func() {
+		track := c.DefaultQuery("t", tCookie)
+		trackIDs := []spotify.ID{spotify.ID(track)}
+		//Build recommend Request
+		seeds := spotify.Seeds{
+			Artists: []spotify.ID{},
+			Tracks:  trackIDs,
+			Genres:  []string{},
+		}
+		recs, err := client.GetRecommendations(seeds, nil, nil)
+		if err != nil {
+			log.Println(err.Error())
+			c.String(http.StatusNotFound, err.Error())
+			return
+		}
+		var b strings.Builder
+		for _, item := range recs.Tracks {
+			b.WriteString(fmt.Sprintf("  %s - %s : %s\n", item.ID, item.Name, item.Artists[0].Name))
+		}
+		c.String(http.StatusOK, b.String())
 	}()
 }
 
