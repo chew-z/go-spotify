@@ -23,7 +23,7 @@ like 403 lack of scope, unexpected endpoint etc.
 const (
 	maxLists       = 5
 	maxTracks      = 5
-	cookieLifetime = 2
+	cookieLifetime = 10
 )
 
 var (
@@ -355,9 +355,9 @@ func artists(c *gin.Context) {
 /* search - searches playlists, albums, tracks etc.
  */
 func search(c *gin.Context) {
+	deuceCookie, _ := c.Cookie("deuce")
 	endpoint := c.Request.URL.Path
 	client := getClient(endpoint)
-	deuceCookie, _ := c.Cookie("deuce")
 	log.Printf("Deuce: %s ", deuceCookie)
 	qCookie, cookieErr := c.Cookie("search_query")
 	cCookie, _ := c.Cookie("search_category")
@@ -398,9 +398,9 @@ func search(c *gin.Context) {
 }
 
 func analyze(c *gin.Context) {
+	deuceCookie, _ := c.Cookie("deuce")
 	endpoint := c.Request.URL.Path
 	client := getClient(endpoint)
-	deuceCookie, _ := c.Cookie("deuce")
 	log.Printf("Deuce: %s ", deuceCookie)
 	qCookie, cookieErr := c.Cookie("search_query")
 	cCookie, _ := c.Cookie("search_category")
@@ -416,9 +416,6 @@ func analyze(c *gin.Context) {
 		if deuceCookie == "1" { // wait for auth to complete
 			client = <-clientChannel
 			log.Printf("%s: Login Completed!", endpoint)
-			// Edge case = WHAT TODO?
-			// - redirects erase search params
-			c.String(http.StatusOK, "Fix this edge case for /search")
 		} else { // redirect to auth URL and exit
 			url := auth.AuthURL(endpoint)
 			log.Printf("%s: redirecting to %s", endpoint, url)
@@ -446,24 +443,20 @@ func analyze(c *gin.Context) {
 /*
  */
 func recommend(c *gin.Context) {
+	deuceCookie, _ := c.Cookie("deuce")
 	endpoint := c.Request.URL.Path
 	client := getClient(endpoint)
-	deuceCookie, _ := c.Cookie("deuce")
 	log.Printf("Deuce: %s ", deuceCookie)
-	tCookie, cookieErr := c.Cookie("track_cookie")
-	if cookieErr != nil {
-		tCookie = "NotSet"
-		c.SetCookie("track_query", c.Query("t"), cookieLifetime, endpoint, "", false, true)
+	for i := 1; i < 6; i++ {
+		cookieName := fmt.Sprintf("t%d", i)
+		c.SetCookie(cookieName, c.Query(cookieName), 45, endpoint, "", false, true)
+		log.Printf("Cookie %s value: %s \n", cookieName, c.Query(cookieName))
 	}
-	log.Printf("Cookie values: %s \n", tCookie)
 
 	if client == nil { // get client from oauth
 		if deuceCookie == "1" { // wait for auth to complete
 			client = <-clientChannel
 			log.Printf("%s: Login Completed!", endpoint)
-			// Edge case = WHAT TODO?
-			// - redirects erase search params
-			c.String(http.StatusOK, "Fix this edge case for /search")
 		} else { // redirect to auth URL and exit
 			url := auth.AuthURL(endpoint)
 			log.Printf("%s: redirecting to %s", endpoint, url)
@@ -474,8 +467,18 @@ func recommend(c *gin.Context) {
 		}
 	}
 	defer func() {
-		track := c.DefaultQuery("t", tCookie)
-		trackIDs := []spotify.ID{spotify.ID(track)}
+		trackIDs := []spotify.ID{}
+		for i := 1; i < 6; i++ {
+			cookieName := fmt.Sprintf("t%d", i)
+			if track, err := c.Cookie(cookieName); err == nil {
+				if len(track) > 0 {
+					trackID := spotify.ID(track)
+					log.Printf("Track cookie %s value: %v \n", cookieName, trackID)
+					trackIDs = append(trackIDs, trackID)
+				}
+			}
+		}
+		log.Printf("%v", trackIDs)
 		//Build recommend Request
 		seeds := spotify.Seeds{
 			Artists: []spotify.ID{},
