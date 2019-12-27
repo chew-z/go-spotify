@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -20,13 +21,14 @@ like 403 lack of scope, unexpected endpoint etc.
 */
 
 const (
-	maxLists  = 5
-	maxTracks = 5
+	maxLists       = 5
+	maxTracks      = 5
+	cookieLifetime = 2
 )
 
 var (
 	kaszka        = cache.New(60*time.Minute, 1*time.Minute)
-	auth          = spotify.NewAuthenticator(redirectURI, spotify.ScopeUserReadPrivate, spotify.ScopeUserTopRead, spotify.ScopeUserLibraryRead, spotify.ScopeUserFollowRead)
+	auth          = spotify.NewAuthenticator(redirectURI, spotify.ScopeUserReadPrivate, spotify.ScopeUserTopRead, spotify.ScopeUserLibraryRead, spotify.ScopeUserFollowRead, spotify.ScopeUserReadRecentlyPlayed)
 	clientChannel = make(chan *spotify.Client)
 	redirectURI   = os.Getenv("REDIRECT_URI")
 )
@@ -47,6 +49,7 @@ func init() {
 	router.GET("/playlists", playlists)
 	router.GET("/albums", albums)
 	router.GET("/artists", artists)
+	router.GET("/recent", recent)
 
 	router.GET("/search", search)
 	router.GET("/analyze", analyze)
@@ -80,7 +83,7 @@ func callback(c *gin.Context) {
 		log.Printf("/callback: Cached client for: %s", endpoint)
 		clientChannel <- &client
 	}()
-	c.SetCookie("deuce", "1", 1, endpoint, "", false, true)
+	c.SetCookie("deuce", "1", cookieLifetime, endpoint, "", false, true)
 	url := fmt.Sprintf("http://%s%s", c.Request.Host, endpoint)
 	defer c.Redirect(303, url)
 	log.Printf("/callback: redirecting to endpoint %s", url)
@@ -90,12 +93,11 @@ func callback(c *gin.Context) {
  */
 func user(c *gin.Context) {
 	endpoint := c.Request.URL.Path
+	client := getClient(endpoint)
 	deuceCookie, _ := c.Cookie("deuce")
 	log.Printf("Deuce: %s ", deuceCookie)
-	client := getClient(endpoint)
 
 	if client == nil { // get client from oauth
-		// if d := c.DefaultQuery("deuce", "0"); d == "1" { // wait for auth to complete
 		if deuceCookie == "1" { // wait for auth to complete
 			client = <-clientChannel
 			log.Printf("%s: Login Completed!", endpoint)
@@ -124,9 +126,9 @@ read zmb3/spotify code to learn more
 */
 func top(c *gin.Context) {
 	endpoint := c.Request.URL.Path
+	client := getClient(endpoint)
 	deuceCookie, _ := c.Cookie("deuce")
 	log.Printf("Deuce: %s ", deuceCookie)
-	client := getClient(endpoint)
 
 	if client == nil { // get client from oauth
 		if deuceCookie == "1" { // wait for auth to complete
@@ -161,11 +163,52 @@ func top(c *gin.Context) {
 		c.String(http.StatusOK, b.String())
 	}()
 }
-func tracks(c *gin.Context) {
+func recent(c *gin.Context) {
 	endpoint := c.Request.URL.Path
+	client := getClient(endpoint)
 	deuceCookie, _ := c.Cookie("deuce")
 	log.Printf("Deuce: %s ", deuceCookie)
+
+	if client == nil { // get client from oauth
+		if deuceCookie == "1" { // wait for auth to complete
+			client = <-clientChannel
+			log.Printf("%s: Login Completed!", endpoint)
+		} else { // redirect to auth URL and exit
+			url := auth.AuthURL(endpoint)
+			log.Printf("%s: redirecting to %s", endpoint, url)
+			// HTTP standard does not pass through HTTP headers on an 302/301 directive
+			// 303 is never cached and always is GET
+			c.Redirect(303, url)
+			return
+		}
+	}
+	defer func() {
+		// use the client to make calls that require authorization
+		recent, err := client.PlayerRecentlyPlayed()
+		if err != nil {
+			log.Panic(err)
+			c.String(http.StatusNotFound, err.Error())
+		}
+		var b strings.Builder
+		b.WriteString("Recently Played :")
+		for _, item := range recent {
+			b.WriteString("\n- ")
+			b.WriteString(" [ ")
+			b.WriteString(item.PlayedAt.Format("15:04:05"))
+			b.WriteString(" ] ")
+			b.WriteString(item.Track.Name)
+			b.WriteString(" --  ")
+			b.WriteString(item.Track.Artists[0].Name)
+		}
+		c.String(http.StatusOK, b.String())
+	}()
+}
+
+func tracks(c *gin.Context) {
+	endpoint := c.Request.URL.Path
 	client := getClient(endpoint)
+	deuceCookie, _ := c.Cookie("deuce")
+	log.Printf("Deuce: %s ", deuceCookie)
 
 	if client == nil { // get client from oauth
 		if deuceCookie == "1" { // wait for auth to complete
@@ -202,9 +245,9 @@ func tracks(c *gin.Context) {
 }
 func playlists(c *gin.Context) {
 	endpoint := c.Request.URL.Path
+	client := getClient(endpoint)
 	deuceCookie, _ := c.Cookie("deuce")
 	log.Printf("Deuce: %s ", deuceCookie)
-	client := getClient(endpoint)
 
 	if client == nil { // get client from oauth
 		if deuceCookie == "1" { // wait for auth to complete
@@ -237,9 +280,9 @@ func playlists(c *gin.Context) {
 }
 func albums(c *gin.Context) {
 	endpoint := c.Request.URL.Path
+	client := getClient(endpoint)
 	deuceCookie, _ := c.Cookie("deuce")
 	log.Printf("Deuce: %s ", deuceCookie)
-	client := getClient(endpoint)
 
 	if client == nil { // get client from oauth
 		if deuceCookie == "1" { // wait for auth to complete
@@ -274,9 +317,9 @@ func albums(c *gin.Context) {
 }
 func artists(c *gin.Context) {
 	endpoint := c.Request.URL.Path
+	client := getClient(endpoint)
 	deuceCookie, _ := c.Cookie("deuce")
 	log.Printf("Deuce: %s ", deuceCookie)
-	client := getClient(endpoint)
 
 	if client == nil { // get client from oauth
 		if deuceCookie == "1" { // wait for auth to complete
@@ -312,16 +355,16 @@ func artists(c *gin.Context) {
  */
 func search(c *gin.Context) {
 	endpoint := c.Request.URL.Path
+	client := getClient(endpoint)
 	deuceCookie, _ := c.Cookie("deuce")
 	log.Printf("Deuce: %s ", deuceCookie)
-	client := getClient(endpoint)
 	qCookie, cookieErr := c.Cookie("search_query")
 	cCookie, _ := c.Cookie("search_category")
 	if cookieErr != nil {
 		qCookie = "NotSet"
 		cCookie = "NotSet"
-		c.SetCookie("search_query", c.Query("q"), 1, endpoint, "", false, true)
-		c.SetCookie("search_category", c.Query("c"), 1, endpoint, "", false, true)
+		c.SetCookie("search_query", c.Query("q"), cookieLifetime, endpoint, "", false, true)
+		c.SetCookie("search_category", c.Query("c"), cookieLifetime, endpoint, "", false, true)
 	}
 	log.Printf("Cookie values: %s %s \n", qCookie, cCookie)
 
@@ -329,9 +372,6 @@ func search(c *gin.Context) {
 		if deuceCookie == "1" { // wait for auth to complete
 			client = <-clientChannel
 			log.Printf("%s: Login Completed!", endpoint)
-			// Edge case = WHAT TODO?
-			// - redirects erase search params
-			c.String(http.StatusOK, "Fix this edge case for /search")
 		} else { // redirect to auth URL and exit
 			url := auth.AuthURL(endpoint)
 			log.Printf("%s: redirecting to %s", endpoint, url)
@@ -358,16 +398,16 @@ func search(c *gin.Context) {
 
 func analyze(c *gin.Context) {
 	endpoint := c.Request.URL.Path
+	client := getClient(endpoint)
 	deuceCookie, _ := c.Cookie("deuce")
 	log.Printf("Deuce: %s ", deuceCookie)
-	client := getClient(endpoint)
 	qCookie, cookieErr := c.Cookie("search_query")
 	cCookie, _ := c.Cookie("search_category")
 	if cookieErr != nil {
 		qCookie = "NotSet"
 		cCookie = "NotSet"
-		c.SetCookie("search_query", c.Query("q"), 1, endpoint, "", false, true)
-		c.SetCookie("search_category", c.Query("c"), 1, endpoint, "", false, true)
+		c.SetCookie("search_query", c.Query("q"), cookieLifetime, endpoint, "", false, true)
+		c.SetCookie("search_category", c.Query("c"), cookieLifetime, endpoint, "", false, true)
 	}
 	log.Printf("Cookie values: %s %s \n", qCookie, cCookie)
 
@@ -447,7 +487,7 @@ func handleSearchResults(results *spotify.SearchResult) string {
 	if results.Artists != nil {
 		b.WriteString("\nArtists:\n")
 		for _, item := range results.Artists.Artists {
-			b.WriteString(fmt.Sprintf("- %s : %s\n", item.Name, item.Popularity))
+			b.WriteString(fmt.Sprintf("- %s : %s\n", item.Name, strconv.Itoa(item.Popularity)))
 		}
 	}
 	return b.String()
