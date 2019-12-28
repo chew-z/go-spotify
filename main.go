@@ -34,6 +34,7 @@ func init() {
 	router.GET("/analyze", analyze)
 	router.GET("/recommend", recommend)
 	router.GET("/spot", spot)
+	router.GET("/mood", mood)
 
 	router.GET("/callback", callback)
 

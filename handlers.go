@@ -22,10 +22,10 @@ const (
 	maxLists       = 5
 	maxTracks      = 5
 	cookieLifetime = 10
-	countryPoland  = "PL"
 )
 
 var (
+	countryPoland = "PL"
 	kaszka        = cache.New(60*time.Minute, 1*time.Minute)
 	auth          = spotify.NewAuthenticator(redirectURI, spotify.ScopeUserReadPrivate, spotify.ScopeUserTopRead, spotify.ScopeUserLibraryRead, spotify.ScopeUserFollowRead, spotify.ScopeUserReadRecentlyPlayed, spotify.ScopePlaylistModifyPublic, spotify.ScopePlaylistModifyPrivate)
 	clientChannel = make(chan *spotify.Client)
@@ -434,6 +434,51 @@ func spot(c *gin.Context) {
 	}
 	defer func() {
 		spotTracks, err := recommendFromTop(client)
+		if err != nil {
+			log.Println(err.Error())
+			c.String(http.StatusNotFound, err.Error())
+			return
+		}
+		recommendedPlaylistID := spotify.ID("7vUhitas9hJkonwMx5t0z5")
+		tracksToAdd := make([]spotify.ID, len(spotTracks))
+		var b strings.Builder
+		for i, item := range spotTracks {
+			tracksToAdd[i] = item.ID
+			b.WriteString(fmt.Sprintf("  %s - %s : %s (%d)\n", item.ID, item.Name, item.Artists[0].Name, item.Popularity))
+		}
+		chunks := chunkIDs(getSpotifyIDs(spotTracks), 100)
+		err = client.ReplacePlaylistTracks(recommendedPlaylistID, chunks[0]...)
+		if err == nil {
+			log.Println("Tracks added")
+		} else {
+			log.Println(err)
+		}
+		c.String(http.StatusOK, b.String())
+	}()
+}
+
+/*
+ */
+func mood(c *gin.Context) {
+	deuceCookie, _ := c.Cookie("deuce")
+	endpoint := c.Request.URL.Path
+	client := getClient(endpoint)
+	log.Printf("Deuce: %s ", deuceCookie)
+	if client == nil { // get client from oauth
+		if deuceCookie == "1" { // wait for auth to complete
+			client = <-clientChannel
+			log.Printf("%s: Login Completed!", endpoint)
+		} else { // redirect to auth URL and exit
+			url := auth.AuthURL(endpoint)
+			log.Printf("%s: redirecting to %s", endpoint, url)
+			// HTTP standard does not pass through HTTP headers on an 302/301 directive
+			// 303 is never cached and always is GET
+			c.Redirect(303, url)
+			return
+		}
+	}
+	defer func() {
+		spotTracks, err := recommendFromMood(client)
 		if err != nil {
 			log.Println(err.Error())
 			c.String(http.StatusNotFound, err.Error())

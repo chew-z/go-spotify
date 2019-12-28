@@ -40,6 +40,56 @@ type recommendationParameters struct {
 	MinTrackCount   int
 }
 
+func appendIfMissing(slice []spotify.ID, i spotify.ID) []spotify.ID {
+	for _, ele := range slice {
+		if ele == i {
+			return slice
+		}
+	}
+	return append(slice, i)
+}
+func recommendFromMood(client *spotify.Client) ([]spotify.FullTrack, error) {
+	recommendedTracks := []spotify.FullTrack{}
+	recentTracks := []spotify.FullTrack{}
+	recentArtistsIDs := []spotify.ID{}
+	recentTracksIDs := []spotify.ID{}
+
+	recentlyPlayed, err := client.PlayerRecentlyPlayed()
+	if err != nil {
+		return recommendedTracks, fmt.Errorf("Failed to get user's recently played: %v", err)
+	}
+
+	for _, item := range recentlyPlayed {
+		track, _ := client.GetTrack(item.Track.ID)
+		recentTracks = append(recentTracks, *track)
+		recentArtistsIDs = appendIfMissing(recentArtistsIDs, item.Track.Artists[0].ID)
+		recentTracksIDs = appendIfMissing(recentTracksIDs, item.Track.ID)
+	}
+	trackAttributes, err := getTrackAttributes(client, recentTracks)
+	if err != nil {
+		return recommendedTracks, err
+	}
+
+	params := recommendationParameters{
+		FromYear:      1999,
+		MinTrackCount: 20,
+		Seeds: spotify.Seeds{
+			// Artists: recentArtistsIDs[0:4],
+			Tracks: recentTracksIDs[0:4],
+		},
+		TrackAttributes: trackAttributes,
+	}
+
+	pageTracks, err := getRecommendedTracks(client, params)
+	if err != nil {
+		return recommendedTracks, err
+	}
+
+	recommendedTracks = append(recommendedTracks, pageTracks...)
+
+	return recommendedTracks, nil
+}
+
 func recommendFromTop(client *spotify.Client) ([]spotify.FullTrack, error) {
 	tracks := []spotify.FullTrack{}
 	pageLimit := 5
