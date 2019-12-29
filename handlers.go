@@ -615,7 +615,6 @@ func mood(c *gin.Context) {
 			err = client.ReplacePlaylistTracks(recommendedPlaylistID, chunks[0]...)
 			if err == nil {
 				log.Println("Tracks added")
-				b.WriteString("Recommended tracks\nAdded to mood playlist\n\n")
 			} else {
 				log.Println(err.Error())
 			}

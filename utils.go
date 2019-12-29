@@ -13,13 +13,9 @@ import (
 
 func getRecommendedTracks(client *spotify.Client, params recommendationParameters) ([]spotify.FullTrack, error) {
 	pageLimit := 100
-	trackCount := 0
-	totalCount := 0
 	tracks := []spotify.FullTrack{}
-
 	options := spotify.Options{
 		Limit:   &pageLimit,
-		Offset:  &totalCount,
 		Country: &countryPoland,
 	}
 
@@ -27,26 +23,19 @@ func getRecommendedTracks(client *spotify.Client, params recommendationParameter
 	if err != nil {
 		return tracks, fmt.Errorf("Failed to get recommendations: %v", err)
 	}
-
-	totalCount += len(page.Tracks)
-
 	fullTracks, err := fullTrackGetMany(client, getSpotifyIDs(page.Tracks))
 	if err != nil {
 		return tracks, err
 	}
-
 	for _, track := range fullTracks {
 		album, err := fullAlbumGet(client, track.Album.ID)
 		if err != nil {
 			return tracks, err
 		}
-
 		if album.ReleaseDateTime().Year() >= params.FromYear {
-			trackCount++
 			tracks = append(tracks, track)
 		}
 	}
-
 	return tracks, nil
 }
 
@@ -59,19 +48,29 @@ func fullTrackGetMany(client *spotify.Client, ids []spotify.ID) ([]spotify.FullT
 	}
 
 	chunks := chunkIDs(ids, pageLimit)
-
 	for _, chunkIDs := range chunks {
 		pointerTracks, err := client.GetTracks(chunkIDs...)
 		if err != nil {
 			return tracks, fmt.Errorf("Failed to get many tracks: %v", err)
 		}
-
 		for _, track := range pointerTracks {
 			tracks = append(tracks, *track)
 		}
 	}
-
 	return tracks, nil
+}
+
+func fullAlbumGet(client *spotify.Client, id spotify.ID) (spotify.FullAlbum, error) {
+	// var albumCache = map[spotify.ID]spotify.FullAlbum{}
+	// if album, exists := albumCache[id]; exists {
+	// 	return album, nil
+	// }
+	album, err := client.GetAlbum(id)
+	if err != nil {
+		return spotify.FullAlbum{}, fmt.Errorf("Failed to get full album %s: %v", id, err)
+	}
+	// albumCache[id] = *album
+	return *album, nil
 }
 
 func chunkIDs(ids []spotify.ID, chunkSize int) [][]spotify.ID {
@@ -90,22 +89,6 @@ func chunkIDs(ids []spotify.ID, chunkSize int) [][]spotify.ID {
 	return chunks
 }
 
-func fullAlbumGet(client *spotify.Client, id spotify.ID) (spotify.FullAlbum, error) {
-	var albumCache = map[spotify.ID]spotify.FullAlbum{}
-	if album, exists := albumCache[id]; exists {
-		return album, nil
-	}
-
-	album, err := client.GetAlbum(id)
-	if err != nil {
-		return spotify.FullAlbum{}, fmt.Errorf("Failed to get full album %s: %v", id, err)
-	}
-
-	albumCache[id] = *album
-
-	return *album, nil
-}
-
 func asAttribute(attributeType string, value float64) float64 {
 	minValue := 0.0
 	maxValue := 1.0
@@ -113,7 +96,7 @@ func asAttribute(attributeType string, value float64) float64 {
 
 	switch strings.ToLower(attributeType) {
 	case "max":
-		minValue = 0.3
+		minValue = .3
 
 		break
 	case "min":
@@ -164,7 +147,6 @@ func getItemPropertyValue(input interface{}, fieldName string) []interface{} {
 
 	for i := 0; i < slice.Len(); i++ {
 		fieldValue := slice.Index(i).FieldByName(fieldName)
-
 		output = append(output, fieldValue.Interface())
 	}
 
