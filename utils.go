@@ -6,6 +6,7 @@ import (
 	"math"
 	"reflect"
 	"strings"
+	"time"
 
 	"github.com/zmb3/spotify"
 )
@@ -177,6 +178,23 @@ func appendIfUnique(slice []spotify.ID, i spotify.ID) []spotify.ID {
 		}
 	}
 	return append(slice, i)
+}
+
+func normalizeRecentlyPlayed(incoming []spotify.RecentlyPlayedItem) []spotify.RecentlyPlayedItem {
+	var outgoing []spotify.RecentlyPlayedItem
+	outgoing = append(outgoing, incoming[0])
+	for i := 1; i < len(incoming); i++ {
+		t1 := incoming[i-1].PlayedAt
+		i1 := incoming[i-1].Track.ID
+		t2 := incoming[i].PlayedAt
+		i2 := incoming[i].Track.ID
+		if t1.Truncate(30*time.Second).Equal(t2.Truncate(30*time.Second)) && i1 == i2 {
+			continue
+		}
+		outgoing = append(outgoing, incoming[i])
+	}
+
+	return outgoing
 }
 
 func averageFloat(values []float64) float64 {

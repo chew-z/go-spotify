@@ -161,17 +161,19 @@ func recent(c *gin.Context) {
 	}
 	defer func() {
 		// use the client to make calls that require authorization
-		recent, err := client.PlayerRecentlyPlayed()
+		recentlyPlayed, err := client.PlayerRecentlyPlayed()
 		if err != nil {
 			log.Panic(err)
 			c.String(http.StatusNotFound, err.Error())
 		}
+		recent := normalizeRecentlyPlayed(recentlyPlayed)
 		var b strings.Builder
 		b.WriteString("Recently Played :")
+		loc, _ := time.LoadLocation("Europe/Warsaw")
 		for _, item := range recent {
 			b.WriteString("\n- ")
 			b.WriteString(" [ ")
-			b.WriteString(item.PlayedAt.Format("15:04:05"))
+			b.WriteString(item.PlayedAt.In(loc).Format("15:04:05"))
 			b.WriteString(" ] ")
 			b.WriteString(item.Track.Name)
 			b.WriteString(" --  ")
