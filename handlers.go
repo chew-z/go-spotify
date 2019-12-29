@@ -132,7 +132,7 @@ func top(c *gin.Context) {
 			b.WriteString(" [ ")
 			b.WriteString(item.Album.Name)
 			b.WriteString(" ] --  ")
-			b.WriteString(item.Artists[0].Name)
+			b.WriteString(joinArtists(item.Artists, ", "))
 		}
 		c.String(http.StatusOK, b.String())
 	}()
@@ -177,7 +177,7 @@ func recent(c *gin.Context) {
 			b.WriteString(" ] ")
 			b.WriteString(item.Track.Name)
 			b.WriteString(" --  ")
-			b.WriteString(item.Track.Artists[0].Name)
+			b.WriteString(joinArtists(item.Track.Artists, ", "))
 		}
 		c.String(http.StatusOK, b.String())
 	}()
@@ -219,7 +219,7 @@ func tracks(c *gin.Context) {
 			b.WriteString(" [ ")
 			b.WriteString(item.Album.Name)
 			b.WriteString(" ] --  ")
-			b.WriteString(item.Artists[0].Name)
+			b.WriteString(joinArtists(item.Artists, ", "))
 		}
 		c.String(http.StatusOK, b.String())
 	}()
@@ -297,7 +297,7 @@ func albums(c *gin.Context) {
 			b.WriteString("\n- ")
 			b.WriteString(item.Name)
 			b.WriteString(" --  ")
-			b.WriteString(item.Artists[0].Name)
+			b.WriteString(joinArtists(item.Artists, ", "))
 		}
 		c.String(http.StatusOK, b.String())
 	}()
@@ -491,13 +491,14 @@ func recommend(c *gin.Context) {
 		if errFull != nil {
 			log.Println(err.Error())
 		} else {
+			b.WriteString("Seeds:\n")
 			for _, item := range seedTracks {
-				b.WriteString(fmt.Sprintf(" * %s - %s : %s\n", item.ID, item.Name, item.Artists[0].Name))
+				b.WriteString(fmt.Sprintf(" * %s - %s : %s\n", item.ID, item.Name, joinArtists(item.Artists, ", ")))
 			}
 		}
 		b.WriteString("---/---\n")
 		for _, item := range recs.Tracks {
-			b.WriteString(fmt.Sprintf("  %s - %s : %s\n", item.ID, item.Name, item.Artists[0].Name))
+			b.WriteString(fmt.Sprintf("  %s - %s : %s\n", item.ID, item.Name, joinArtists(item.Artists, ", ")))
 		}
 		c.String(http.StatusOK, b.String())
 	}()
@@ -559,7 +560,7 @@ func spot(c *gin.Context) {
 			b.WriteString("Printing only, pass params (r=1, p=playlistID) if you wish to replace with recommended tracks\n")
 		}
 		for _, item := range spotTracks {
-			b.WriteString(fmt.Sprintf("  %s - %s : %s (%d)\n", item.ID, item.Name, item.Artists[0].Name, item.Popularity))
+			b.WriteString(fmt.Sprintf("  %s - %s : %s (%d)\n", item.ID, item.Name, joinArtists(item.Artists, ", "), item.Popularity))
 		}
 
 		c.String(http.StatusOK, b.String())
@@ -622,7 +623,7 @@ func mood(c *gin.Context) {
 			b.WriteString("Printing only, pass params (r=1, p=playlistID) if you wish to replace with recommended tracks\n")
 		}
 		for _, item := range spotTracks {
-			b.WriteString(fmt.Sprintf("  %s - %s : %s (%d)\n", item.ID, item.Name, item.Artists[0].Name, item.Popularity))
+			b.WriteString(fmt.Sprintf("  %s - %s : %s (%d)\n", item.ID, item.Name, joinArtists(item.Artists, ", "), item.Popularity))
 		}
 
 		c.String(http.StatusOK, b.String())

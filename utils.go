@@ -153,6 +153,19 @@ func getItemPropertyValue(input interface{}, fieldName string) []interface{} {
 	return output
 }
 
+func joinArtists(artists []spotify.SimpleArtist, separator string) string {
+	return strings.Join(
+		func() []string {
+			output := []string{}
+			for _, a := range artists {
+				output = append(output, a.Name)
+			}
+			return output
+		}(),
+		separator,
+	)
+}
+
 func appendIfUnique(slice []spotify.ID, i spotify.ID) []spotify.ID {
 	for _, ele := range slice {
 		if ele == i {
