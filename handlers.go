@@ -19,9 +19,10 @@ like 403 lack of scope, unexpected endpoint etc.
 */
 
 const (
-	maxLists       = 5
-	maxTracks      = 5
-	cookieLifetime = 10
+	maxLists              = 5
+	maxTracks             = 5
+	cookieLifetime        = 10
+	defaultMoodPlaylistID = "7vUhitas9hJkonwMx5t0z5"
 )
 
 var (
@@ -62,7 +63,7 @@ func callback(c *gin.Context) {
 	log.Printf("/callback: redirecting to endpoint %s", url)
 }
 
-/*
+/* user - displays user identity (display name)
  */
 func user(c *gin.Context) {
 	endpoint := c.Request.URL.Path
@@ -94,7 +95,7 @@ func user(c *gin.Context) {
 	}()
 }
 
-/* top - prints user top tracks (sensible defaults)
+/* top - prints user's top tracks (sensible defaults)
 read zmb3/spotify code to learn more
 */
 func top(c *gin.Context) {
@@ -136,6 +137,9 @@ func top(c *gin.Context) {
 		c.String(http.StatusOK, b.String())
 	}()
 }
+
+/* recent - display recently played tracks
+ */
 func recent(c *gin.Context) {
 	endpoint := c.Request.URL.Path
 	client := getClient(endpoint)
@@ -177,6 +181,8 @@ func recent(c *gin.Context) {
 	}()
 }
 
+/* tracks - display some of user's tracks
+ */
 func tracks(c *gin.Context) {
 	endpoint := c.Request.URL.Path
 	client := getClient(endpoint)
@@ -216,6 +222,9 @@ func tracks(c *gin.Context) {
 		c.String(http.StatusOK, b.String())
 	}()
 }
+
+/* playlists - display some of user's playlists
+ */
 func playlists(c *gin.Context) {
 	endpoint := c.Request.URL.Path
 	client := getClient(endpoint)
@@ -251,6 +260,9 @@ func playlists(c *gin.Context) {
 		c.String(http.StatusOK, b.String())
 	}()
 }
+
+/* albums - display some of user's albums
+ */
 func albums(c *gin.Context) {
 	endpoint := c.Request.URL.Path
 	client := getClient(endpoint)
@@ -288,6 +300,9 @@ func albums(c *gin.Context) {
 		c.String(http.StatusOK, b.String())
 	}()
 }
+
+/* artists - displays user followed artists
+ */
 func artists(c *gin.Context) {
 	endpoint := c.Request.URL.Path
 	client := getClient(endpoint)
@@ -324,7 +339,7 @@ func artists(c *gin.Context) {
 	}()
 }
 
-/* search - searches playlists, albums, tracks etc.
+/* search - searches for playlists, albums, tracks etc.
  */
 func search(c *gin.Context) {
 	deuceCookie, _ := c.Cookie("deuce")
@@ -369,6 +384,9 @@ func search(c *gin.Context) {
 	}()
 }
 
+/* analyze - search for tracks and display
+analysis of results
+*/
 func analyze(c *gin.Context) {
 	deuceCookie, _ := c.Cookie("deuce")
 	endpoint := c.Request.URL.Path
@@ -412,13 +430,24 @@ func analyze(c *gin.Context) {
 	}()
 }
 
-/*
- */
+/* spot - recommend tracks based on user top artists
+recommeded tracks could replace default mood playlist
+or any other (based on passed parameters)
+r=1 - replace, p=[ID]
+*/
 func spot(c *gin.Context) {
 	deuceCookie, _ := c.Cookie("deuce")
 	endpoint := c.Request.URL.Path
 	client := getClient(endpoint)
 	log.Printf("Deuce: %s ", deuceCookie)
+	replaceCookie, cookieErr := c.Cookie("replace_playlist")
+	playlistCookie, _ := c.Cookie("playlist_ID")
+	if cookieErr != nil {
+		c.SetCookie("replace_playlist", c.Query("r"), cookieLifetime, endpoint, "", false, true)
+		c.SetCookie("playlist_ID", c.DefaultQuery("p", defaultMoodPlaylistID), cookieLifetime, endpoint, "", false, true)
+	}
+	log.Printf("Cookie values: %s %s \n", replaceCookie, playlistCookie)
+
 	if client == nil { // get client from oauth
 		if deuceCookie == "1" { // wait for auth to complete
 			client = <-clientChannel
@@ -439,31 +468,49 @@ func spot(c *gin.Context) {
 			c.String(http.StatusNotFound, err.Error())
 			return
 		}
-		recommendedPlaylistID := spotify.ID("7vUhitas9hJkonwMx5t0z5")
 		tracksToAdd := make([]spotify.ID, len(spotTracks))
 		var b strings.Builder
 		for i, item := range spotTracks {
 			tracksToAdd[i] = item.ID
 			b.WriteString(fmt.Sprintf("  %s - %s : %s (%d)\n", item.ID, item.Name, item.Artists[0].Name, item.Popularity))
 		}
-		chunks := chunkIDs(getSpotifyIDs(spotTracks), 100)
-		err = client.ReplacePlaylistTracks(recommendedPlaylistID, chunks[0]...)
-		if err == nil {
-			log.Println("Tracks added")
-		} else {
-			log.Println(err)
+
+		replace := c.DefaultQuery("r", replaceCookie)
+		playlist := c.DefaultQuery("p", playlistCookie)
+		if replace == "1" {
+			recommendedPlaylistID := spotify.ID(playlist)
+			chunks := chunkIDs(getSpotifyIDs(spotTracks), 100)
+			err = client.ReplacePlaylistTracks(recommendedPlaylistID, chunks[0]...)
+
+			if err == nil {
+				log.Println("Tracks added")
+			} else {
+				log.Println(err)
+			}
 		}
 		c.String(http.StatusOK, b.String())
 	}()
 }
 
-/*
- */
+/* mood - recommends tracks based on current mood
+(recently played tracks)
+recommeded tracks could replace default mood playlist
+or any other (based on passed parameters)
+r=1 - replace, p=[ID]
+*/
 func mood(c *gin.Context) {
 	deuceCookie, _ := c.Cookie("deuce")
 	endpoint := c.Request.URL.Path
 	client := getClient(endpoint)
 	log.Printf("Deuce: %s ", deuceCookie)
+	replaceCookie, cookieErr := c.Cookie("replace_playlist")
+	playlistCookie, _ := c.Cookie("playlist_ID")
+	if cookieErr != nil {
+		c.SetCookie("replace_playlist", c.Query("r"), cookieLifetime, endpoint, "", false, true)
+		c.SetCookie("playlist_ID", c.DefaultQuery("p", defaultMoodPlaylistID), cookieLifetime, endpoint, "", false, true)
+	}
+	log.Printf("Cookie values: %s %s \n", replaceCookie, playlistCookie)
+
 	if client == nil { // get client from oauth
 		if deuceCookie == "1" { // wait for auth to complete
 			client = <-clientChannel
@@ -484,26 +531,33 @@ func mood(c *gin.Context) {
 			c.String(http.StatusNotFound, err.Error())
 			return
 		}
-		recommendedPlaylistID := spotify.ID("7vUhitas9hJkonwMx5t0z5")
 		tracksToAdd := make([]spotify.ID, len(spotTracks))
 		var b strings.Builder
 		for i, item := range spotTracks {
 			tracksToAdd[i] = item.ID
 			b.WriteString(fmt.Sprintf("  %s - %s : %s (%d)\n", item.ID, item.Name, item.Artists[0].Name, item.Popularity))
 		}
-		chunks := chunkIDs(getSpotifyIDs(spotTracks), 100)
-		err = client.ReplacePlaylistTracks(recommendedPlaylistID, chunks[0]...)
-		if err == nil {
-			log.Println("Tracks added")
-		} else {
-			log.Println(err)
+
+		replace := c.DefaultQuery("r", replaceCookie)
+		playlist := c.DefaultQuery("p", playlistCookie)
+		if replace == "1" {
+			recommendedPlaylistID := spotify.ID(playlist)
+			chunks := chunkIDs(getSpotifyIDs(spotTracks), 100)
+			err = client.ReplacePlaylistTracks(recommendedPlaylistID, chunks[0]...)
+			if err == nil {
+				log.Println("Tracks added")
+			} else {
+				log.Println(err.Error())
+			}
 		}
 		c.String(http.StatusOK, b.String())
 	}()
 }
 
-/*
- */
+/* recommend songs based on given tracks (maximum 5)
+accepts query parameters t1..t5 with trackIDs.
+prints recommended tracks
+*/
 func recommend(c *gin.Context) {
 	deuceCookie, _ := c.Cookie("deuce")
 	endpoint := c.Request.URL.Path
