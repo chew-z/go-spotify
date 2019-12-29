@@ -5,6 +5,7 @@ import (
 	"log"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/zmb3/spotify"
 )
@@ -27,6 +28,25 @@ type recommendationParameters struct {
 	TrackAttributes *spotify.TrackAttributes
 	FromYear        int
 	MinTrackCount   int
+}
+
+/* getClient - restore client for given state from cache
+or return nil
+*/
+func getClient(endpoint string) *spotify.Client {
+	if gclient, foundClient := kaszka.Get(endpoint); foundClient {
+		log.Printf("Cached client found for: %s", endpoint)
+		client := gclient.(*spotify.Client)
+		if tok, err := client.Token(); err != nil {
+			log.Panic(err)
+		} else {
+			log.Printf("Token will expire in %s", tok.Expiry.Sub(time.Now()).String())
+		}
+		return client
+	}
+	msg := fmt.Sprintf("No cached client found for: %s", endpoint)
+	log.Println(msg)
+	return nil
 }
 
 func recommendFromMood(client *spotify.Client) ([]spotify.FullTrack, error) {

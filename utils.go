@@ -6,19 +6,9 @@ import (
 	"math"
 	"reflect"
 	"strings"
-	"time"
 
 	"github.com/zmb3/spotify"
 )
-
-func appendIfUnique(slice []spotify.ID, i spotify.ID) []spotify.ID {
-	for _, ele := range slice {
-		if ele == i {
-			return slice
-		}
-	}
-	return append(slice, i)
-}
 
 func getRecommendedTracks(client *spotify.Client, params recommendationParameters) ([]spotify.FullTrack, error) {
 	pageLimit := 100
@@ -180,33 +170,21 @@ func getItemPropertyValue(input interface{}, fieldName string) []interface{} {
 	return output
 }
 
+func appendIfUnique(slice []spotify.ID, i spotify.ID) []spotify.ID {
+	for _, ele := range slice {
+		if ele == i {
+			return slice
+		}
+	}
+	return append(slice, i)
+}
+
 func averageFloat(values []float64) float64 {
 	var total float64
-
 	for _, value := range values {
 		total += value
 	}
-
 	return total / float64(len(values))
-}
-
-/* getClient - restore client for given state from cache
-or return nil
-*/
-func getClient(endpoint string) *spotify.Client {
-	if gclient, foundClient := kaszka.Get(endpoint); foundClient {
-		log.Printf("Cached client found for: %s", endpoint)
-		client := gclient.(*spotify.Client)
-		if tok, err := client.Token(); err != nil {
-			log.Panic(err)
-		} else {
-			log.Printf("Token will expire in %s", tok.Expiry.Sub(time.Now()).String())
-		}
-		return client
-	}
-	msg := fmt.Sprintf("No cached client found for: %s", endpoint)
-	log.Println(msg)
-	return nil
 }
 
 func searchType(a string) spotify.SearchType {

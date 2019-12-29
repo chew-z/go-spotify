@@ -430,6 +430,77 @@ func analyze(c *gin.Context) {
 	}()
 }
 
+/* recommend songs based on given tracks (maximum 5)
+accepts query parameters t1..t5 with trackIDs.
+prints recommended tracks
+*/
+func recommend(c *gin.Context) {
+	deuceCookie, _ := c.Cookie("deuce")
+	endpoint := c.Request.URL.Path
+	client := getClient(endpoint)
+	log.Printf("Deuce: %s ", deuceCookie)
+	for i := 1; i < 6; i++ {
+		cookieName := fmt.Sprintf("t%d", i)
+		c.SetCookie(cookieName, c.Query(cookieName), 45, endpoint, "", false, true)
+		log.Printf("Cookie %s value: %s \n", cookieName, c.Query(cookieName))
+	}
+
+	if client == nil { // get client from oauth
+		if deuceCookie == "1" { // wait for auth to complete
+			client = <-clientChannel
+			log.Printf("%s: Login Completed!", endpoint)
+		} else { // redirect to auth URL and exit
+			url := auth.AuthURL(endpoint)
+			log.Printf("%s: redirecting to %s", endpoint, url)
+			// HTTP standard does not pass through HTTP headers on an 302/301 directive
+			// 303 is never cached and always is GET
+			c.Redirect(303, url)
+			return
+		}
+	}
+	defer func() {
+		trackIDs := []spotify.ID{}
+		for i := 1; i < 6; i++ {
+			cookieName := fmt.Sprintf("t%d", i)
+			if track, err := c.Cookie(cookieName); err == nil {
+				if len(track) > 0 {
+					trackID := spotify.ID(track)
+					log.Printf("Track cookie %s value: %v \n", cookieName, trackID)
+					trackIDs = appendIfUnique(trackIDs, trackID)
+				}
+			}
+		}
+		log.Printf("%v", trackIDs)
+		//Build recommend Request
+		seeds := spotify.Seeds{
+			Artists: []spotify.ID{},
+			Tracks:  trackIDs,
+			Genres:  []string{},
+		}
+		recs, err := client.GetRecommendations(seeds, nil, nil)
+		if err != nil {
+			log.Println(err.Error())
+			c.String(http.StatusNotFound, err.Error())
+			return
+		}
+		var b strings.Builder
+		b.WriteString("Recommended tracks based on following tracks\n")
+		seedTracks, errFull := fullTrackGetMany(client, trackIDs)
+		if errFull != nil {
+			log.Println(err.Error())
+		} else {
+			for _, item := range seedTracks {
+				b.WriteString(fmt.Sprintf(" * %s - %s : %s\n", item.ID, item.Name, item.Artists[0].Name))
+			}
+		}
+		b.WriteString("---/---\n")
+		for _, item := range recs.Tracks {
+			b.WriteString(fmt.Sprintf("  %s - %s : %s\n", item.ID, item.Name, item.Artists[0].Name))
+		}
+		c.String(http.StatusOK, b.String())
+	}()
+}
+
 /* spot - recommend tracks based on user top artists
 recommeded tracks could replace default mood playlist
 or any other (based on passed parameters)
@@ -468,13 +539,8 @@ func spot(c *gin.Context) {
 			c.String(http.StatusNotFound, err.Error())
 			return
 		}
-		tracksToAdd := make([]spotify.ID, len(spotTracks))
 		var b strings.Builder
-		for i, item := range spotTracks {
-			tracksToAdd[i] = item.ID
-			b.WriteString(fmt.Sprintf("  %s - %s : %s (%d)\n", item.ID, item.Name, item.Artists[0].Name, item.Popularity))
-		}
-
+		b.WriteString("Recommended tracks based on your top artists\n")
 		replace := c.DefaultQuery("r", replaceCookie)
 		playlist := c.DefaultQuery("p", playlistCookie)
 		if replace == "1" {
@@ -487,7 +553,13 @@ func spot(c *gin.Context) {
 			} else {
 				log.Println(err)
 			}
+		} else {
+			b.WriteString("Printing only, pass params (r=1, p=playlistID) if you wish to replace with recommended tracks\n")
 		}
+		for _, item := range spotTracks {
+			b.WriteString(fmt.Sprintf("  %s - %s : %s (%d)\n", item.ID, item.Name, item.Artists[0].Name, item.Popularity))
+		}
+
 		c.String(http.StatusOK, b.String())
 	}()
 }
@@ -531,13 +603,8 @@ func mood(c *gin.Context) {
 			c.String(http.StatusNotFound, err.Error())
 			return
 		}
-		tracksToAdd := make([]spotify.ID, len(spotTracks))
 		var b strings.Builder
-		for i, item := range spotTracks {
-			tracksToAdd[i] = item.ID
-			b.WriteString(fmt.Sprintf("  %s - %s : %s (%d)\n", item.ID, item.Name, item.Artists[0].Name, item.Popularity))
-		}
-
+		b.WriteString("Recommended tracks based on recently listened to\n")
 		replace := c.DefaultQuery("r", replaceCookie)
 		playlist := c.DefaultQuery("p", playlistCookie)
 		if replace == "1" {
@@ -546,71 +613,17 @@ func mood(c *gin.Context) {
 			err = client.ReplacePlaylistTracks(recommendedPlaylistID, chunks[0]...)
 			if err == nil {
 				log.Println("Tracks added")
+				b.WriteString("Recommended tracks\nAdded to mood playlist\n\n")
 			} else {
 				log.Println(err.Error())
 			}
+		} else {
+			b.WriteString("Printing only, pass params (r=1, p=playlistID) if you wish to replace with recommended tracks\n")
 		}
-		c.String(http.StatusOK, b.String())
-	}()
-}
+		for _, item := range spotTracks {
+			b.WriteString(fmt.Sprintf("  %s - %s : %s (%d)\n", item.ID, item.Name, item.Artists[0].Name, item.Popularity))
+		}
 
-/* recommend songs based on given tracks (maximum 5)
-accepts query parameters t1..t5 with trackIDs.
-prints recommended tracks
-*/
-func recommend(c *gin.Context) {
-	deuceCookie, _ := c.Cookie("deuce")
-	endpoint := c.Request.URL.Path
-	client := getClient(endpoint)
-	log.Printf("Deuce: %s ", deuceCookie)
-	for i := 1; i < 6; i++ {
-		cookieName := fmt.Sprintf("t%d", i)
-		c.SetCookie(cookieName, c.Query(cookieName), 45, endpoint, "", false, true)
-		log.Printf("Cookie %s value: %s \n", cookieName, c.Query(cookieName))
-	}
-
-	if client == nil { // get client from oauth
-		if deuceCookie == "1" { // wait for auth to complete
-			client = <-clientChannel
-			log.Printf("%s: Login Completed!", endpoint)
-		} else { // redirect to auth URL and exit
-			url := auth.AuthURL(endpoint)
-			log.Printf("%s: redirecting to %s", endpoint, url)
-			// HTTP standard does not pass through HTTP headers on an 302/301 directive
-			// 303 is never cached and always is GET
-			c.Redirect(303, url)
-			return
-		}
-	}
-	defer func() {
-		trackIDs := []spotify.ID{}
-		for i := 1; i < 6; i++ {
-			cookieName := fmt.Sprintf("t%d", i)
-			if track, err := c.Cookie(cookieName); err == nil {
-				if len(track) > 0 {
-					trackID := spotify.ID(track)
-					log.Printf("Track cookie %s value: %v \n", cookieName, trackID)
-					trackIDs = append(trackIDs, trackID)
-				}
-			}
-		}
-		log.Printf("%v", trackIDs)
-		//Build recommend Request
-		seeds := spotify.Seeds{
-			Artists: []spotify.ID{},
-			Tracks:  trackIDs,
-			Genres:  []string{},
-		}
-		recs, err := client.GetRecommendations(seeds, nil, nil)
-		if err != nil {
-			log.Println(err.Error())
-			c.String(http.StatusNotFound, err.Error())
-			return
-		}
-		var b strings.Builder
-		for _, item := range recs.Tracks {
-			b.WriteString(fmt.Sprintf("  %s - %s : %s\n", item.ID, item.Name, item.Artists[0].Name))
-		}
 		c.String(http.StatusOK, b.String())
 	}()
 }
