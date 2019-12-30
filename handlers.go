@@ -149,7 +149,8 @@ func top(c *gin.Context) {
 }
 
 /* recent - display recently played tracks
- */
+and save(update) recently played tracks to Cloud Firestore database
+*/
 func recent(c *gin.Context) {
 	endpoint := c.Request.URL.Path
 	client := getClient(endpoint)
@@ -176,52 +177,6 @@ func recent(c *gin.Context) {
 			log.Panic(err)
 			c.String(http.StatusNotFound, err.Error())
 		}
-		recent := normalizeRecentlyPlayed(recentlyPlayed)
-		var b strings.Builder
-		b.WriteString("Recently Played :")
-		loc, _ := time.LoadLocation("Europe/Warsaw")
-		for _, item := range recent {
-			b.WriteString("\n- ")
-			b.WriteString(" [ ")
-			b.WriteString(item.PlayedAt.In(loc).Format("15:04:05"))
-			b.WriteString(" ] ")
-			b.WriteString(item.Track.Name)
-			b.WriteString(" --  ")
-			b.WriteString(joinArtists(item.Track.Artists, ", "))
-		}
-		c.String(http.StatusOK, b.String())
-	}()
-}
-
-/* store - save recently played tracks to Cloud Firestore database
- */
-func store(c *gin.Context) {
-	endpoint := c.Request.URL.Path
-	client := getClient(endpoint)
-	deuceCookie, _ := c.Cookie("deuce")
-	log.Printf("Deuce: %s ", deuceCookie)
-
-	if client == nil { // get client from oauth
-		if deuceCookie == "1" { // wait for auth to complete
-			client = <-clientChannel
-			log.Printf("%s: Login Completed!", endpoint)
-		} else { // redirect to auth URL and exit
-			url := auth.AuthURL(endpoint)
-			log.Printf("%s: redirecting to %s", endpoint, url)
-			// HTTP standard does not pass through HTTP headers on an 302/301 directive
-			// 303 is never cached and always is GET
-			c.Redirect(303, url)
-			return
-		}
-	}
-	defer func() {
-		// use the client to make calls that require authorization
-		recentlyPlayed, err := client.PlayerRecentlyPlayed()
-		if err != nil {
-			log.Panic(err)
-			c.String(http.StatusNotFound, err.Error())
-		}
-		recent := normalizeRecentlyPlayed(recentlyPlayed)
 
 		ctx := context.Background()
 		firestoreClient := initFirestoreDatabase(ctx)
@@ -232,7 +187,7 @@ func store(c *gin.Context) {
 		b.WriteString("Recently Played :")
 		loc, _ := time.LoadLocation("Europe/Warsaw")
 		// Get a new write batch.
-		for _, item := range recent {
+		for _, item := range recentlyPlayed {
 			artists := joinArtists(item.Track.Artists, ", ")
 			playedAt := item.PlayedAt.In(loc).Format("15:04:05")
 
@@ -264,52 +219,32 @@ func store(c *gin.Context) {
 
 /* restore - read saved tracks from Cloud Firestore database
  */
-func restore(c *gin.Context) {
-	endpoint := c.Request.URL.Path
-	client := getClient(endpoint)
-	deuceCookie, _ := c.Cookie("deuce")
-	log.Printf("Deuce: %s ", deuceCookie)
-
-	if client == nil { // get client from oauth
-		if deuceCookie == "1" { // wait for auth to complete
-			client = <-clientChannel
-			log.Printf("%s: Login Completed!", endpoint)
-		} else { // redirect to auth URL and exit
-			url := auth.AuthURL(endpoint)
-			log.Printf("%s: redirecting to %s", endpoint, url)
-			// HTTP standard does not pass through HTTP headers on an 302/301 directive
-			// 303 is never cached and always is GET
-			c.Redirect(303, url)
-			return
+func history(c *gin.Context) {
+	ctx := context.Background()
+	firestoreClient := initFirestoreDatabase(ctx)
+	defer firestoreClient.Close()
+	var b strings.Builder
+	b.WriteString("Recently Played :\n")
+	// iter := firestoreClient.Collection("recently_played").Documents(ctx)
+	iter := firestoreClient.Collection("recently_played").OrderBy("played_at", firestore.Desc).Limit(100).Documents(ctx)
+	var tr firestoreTrack
+	for {
+		doc, err := iter.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			log.Println(err.Error())
+		}
+		if err := doc.DataTo(&tr); err != nil {
+			log.Println(err.Error())
+		} else {
+			b.WriteString(fmt.Sprintf("[ %s ] %s -- %s\n", tr.PlayedAt, tr.Name, tr.Artists))
 		}
 	}
-	defer func() {
-		ctx := context.Background()
-		firestoreClient := initFirestoreDatabase(ctx)
-		defer firestoreClient.Close()
-		var b strings.Builder
-		b.WriteString("Recently Played :\n")
-		// iter := firestoreClient.Collection("recently_played").Documents(ctx)
-		iter := firestoreClient.Collection("recently_played").OrderBy("played_at", firestore.Desc).Limit(100).Documents(ctx)
-		var tr firestoreTrack
-		for {
-			doc, err := iter.Next()
-			if err == iterator.Done {
-				break
-			}
-			if err != nil {
-				log.Println(err.Error())
-			}
-			if err := doc.DataTo(&tr); err != nil {
-				log.Println(err.Error())
-			} else {
-				b.WriteString(fmt.Sprintf("[ %s ] %s -- %s\n", tr.PlayedAt, tr.Name, tr.Artists))
-			}
-		}
 
-		c.String(http.StatusOK, b.String())
+	c.String(http.StatusOK, b.String())
 
-	}()
 }
 
 /* tracks - display some of user's tracks
