@@ -27,6 +27,8 @@ func init() {
 	router.GET("/user", user)
 	router.GET("/top", top)
 	router.GET("/recent", recent)
+	router.GET("/store", store)
+	router.GET("/restore", restore)
 	router.GET("/tracks", tracks)
 	router.GET("/playlists", playlists)
 	router.GET("/albums", albums)
