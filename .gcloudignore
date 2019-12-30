@@ -3,7 +3,6 @@ deploy.sh
 .gitignore
 bin/**
 token.json
-*.json
 *.bak
 *.bak.go
 spotify.txt

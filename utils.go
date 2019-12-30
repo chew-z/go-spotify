@@ -1,39 +1,32 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"math"
+	"os"
 	"reflect"
 	"strings"
 	"time"
 
+	"cloud.google.com/go/firestore"
 	"github.com/zmb3/spotify"
+	"google.golang.org/api/option"
 )
 
-// var firestoreClient *firestore.Client
+func initFirestoreDatabase(ctx context.Context) *firestore.Client {
+	// conf := &firebase.Config{ProjectID: os.Getenv("GOOGLE_CLOUD_PROJECT")}
+	sa := option.WithCredentialsFile(".firebase-credentials.json")
+	firestoreClient, err := firestore.NewClient(ctx, os.Getenv("GOOGLE_CLOUD_PROJECT"), sa)
+	if err != nil {
+		log.Panic(err)
+	}
+	return firestoreClient
+}
 
-// // InitFirestoreDatabase init main firestore client
-// func InitFirestoreDatabase() {
-// 	firestoreClient, err := firestore.NewClient(context.Background(), os.Getenv("GOOGLE_CLOUD_PROJECT"))
-// 	if err != nil {
-// 		log.Fatalf("Failed to create client: %v", err)
-// 	}
-// 	return firestoreClient
-// }
-
-// // Firestore Getter for firestore database
-// func Firestore() *firestore.Client {
-// 	return firestoreClient
-// }
-
-// CloseConnection clone connection with Firebase
-// func CloseConnection() {
-// 	// Close client when done.
-// 	defer firestoreClient.Close()
-// }
 func getRecommendedTracks(client *spotify.Client, params recommendationParameters) ([]spotify.FullTrack, error) {
-	pageLimit := 100
+	pageLimit := 50
 	tracks := []spotify.FullTrack{}
 	options := spotify.Options{
 		Limit:   &pageLimit,

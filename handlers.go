@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"cloud.google.com/go/firestore"
-	firebase "firebase.google.com/go"
 	"github.com/gin-gonic/gin"
 	"github.com/patrickmn/go-cache"
 	"github.com/zmb3/spotify"
@@ -30,12 +29,19 @@ const (
 )
 
 var (
-	countryPoland = "PL"
-	kaszka        = cache.New(60*time.Minute, 1*time.Minute)
-	auth          = spotify.NewAuthenticator(redirectURI, spotify.ScopeUserReadPrivate, spotify.ScopeUserTopRead, spotify.ScopeUserLibraryRead, spotify.ScopeUserFollowRead, spotify.ScopeUserReadRecentlyPlayed, spotify.ScopePlaylistModifyPublic, spotify.ScopePlaylistModifyPrivate)
-	clientChannel = make(chan *spotify.Client)
-	redirectURI   = os.Getenv("REDIRECT_URI")
+	countryPoland   = "PL"
+	kaszka          = cache.New(60*time.Minute, 1*time.Minute)
+	auth            = spotify.NewAuthenticator(redirectURI, spotify.ScopeUserReadPrivate, spotify.ScopeUserTopRead, spotify.ScopeUserLibraryRead, spotify.ScopeUserFollowRead, spotify.ScopeUserReadRecentlyPlayed, spotify.ScopePlaylistModifyPublic, spotify.ScopePlaylistModifyPrivate)
+	clientChannel   = make(chan *spotify.Client)
+	redirectURI     = os.Getenv("REDIRECT_URI")
+	firestoreClient *firestore.Client
 )
+
+type firestoreTrack struct {
+	Name     string `firestore:"track_name"`
+	Artists  string `firestore:"artists"`
+	PlayedAt string `firestore:"played_at"`
+}
 
 /* statefull authorization handler using channels
 state = calling endpoint (which is intended use of scope)
@@ -216,23 +222,16 @@ func store(c *gin.Context) {
 			c.String(http.StatusNotFound, err.Error())
 		}
 		recent := normalizeRecentlyPlayed(recentlyPlayed)
-		// Use the application default credentials
-		ctx := context.Background()
-		conf := &firebase.Config{ProjectID: os.Getenv("GOOGLE_CLOUD_PROJECT")}
-		app, err := firebase.NewApp(ctx, conf)
-		if err != nil {
-			log.Println(err.Error())
-		}
 
-		firestoreClient, err := app.Firestore(ctx)
-		if err != nil {
-			log.Println(err.Error())
-		}
+		ctx := context.Background()
+		firestoreClient := initFirestoreDatabase(ctx)
+		batch := firestoreClient.Batch()
 		defer firestoreClient.Close()
 
 		var b strings.Builder
 		b.WriteString("Recently Played :")
 		loc, _ := time.LoadLocation("Europe/Warsaw")
+		// Get a new write batch.
 		for _, item := range recent {
 			artists := joinArtists(item.Track.Artists, ", ")
 			playedAt := item.PlayedAt.In(loc).Format("15:04:05")
@@ -245,15 +244,19 @@ func store(c *gin.Context) {
 			b.WriteString(" --  ")
 			b.WriteString(artists)
 
-			// _, _, err = firestoreClient.Collection("recently_played").Add(ctx, map[string]interface{}{
-			_, err = firestoreClient.Collection("recently_played").Doc(string(item.Track.ID)).Set(ctx, map[string]interface{}{
+			recentlyPlayedRef := firestoreClient.Collection("recently_played").Doc(string(item.Track.ID))
+			batch.Set(recentlyPlayedRef, map[string]interface{}{
 				"played_at":  playedAt,
 				"track_name": item.Track.Name,
 				"artists":    artists,
-			})
-			if err != nil {
-				log.Println(err.Error())
-			}
+			}, firestore.MergeAll) // Overwrite only the fields in the map; preserve all others.
+
+		}
+		// Commit the batch.
+		_, errBatch := batch.Commit(ctx)
+		if errBatch != nil {
+			// Handle any errors in an appropriate way, such as returning them.
+			log.Printf("An error while commiting batch to firestore: %s", err)
 		}
 		c.String(http.StatusOK, b.String())
 	}()
@@ -281,28 +284,14 @@ func restore(c *gin.Context) {
 		}
 	}
 	defer func() {
-		// Use the application default credentials
 		ctx := context.Background()
-		conf := &firebase.Config{ProjectID: os.Getenv("GOOGLE_CLOUD_PROJECT")}
-		app, err := firebase.NewApp(ctx, conf)
-		if err != nil {
-			log.Println(err.Error())
-		}
-
-		firestoreClient, err := app.Firestore(ctx)
-		if err != nil {
-			log.Println(err.Error())
-		}
+		firestoreClient := initFirestoreDatabase(ctx)
 		defer firestoreClient.Close()
-		type FirestoreTrack struct {
-			Name     string `firestore:"track_name"`
-			Artists  string `firestore:"artists"`
-			PlayedAt string `firestore:"played_at"`
-		}
 		var b strings.Builder
 		b.WriteString("Recently Played :\n")
 		// iter := firestoreClient.Collection("recently_played").Documents(ctx)
 		iter := firestoreClient.Collection("recently_played").OrderBy("played_at", firestore.Desc).Limit(100).Documents(ctx)
+		var tr firestoreTrack
 		for {
 			doc, err := iter.Next()
 			if err == iterator.Done {
@@ -311,15 +300,11 @@ func restore(c *gin.Context) {
 			if err != nil {
 				log.Println(err.Error())
 			}
-			var tr FirestoreTrack
 			if err := doc.DataTo(&tr); err != nil {
 				log.Println(err.Error())
+			} else {
+				b.WriteString(fmt.Sprintf("[ %s ] %s -- %s\n", tr.PlayedAt, tr.Name, tr.Artists))
 			}
-			b.WriteString(fmt.Sprintf("[ %s ] %s -- %s\n", tr.PlayedAt, tr.Name, tr.Artists))
-			// for key, value := range doc.Data() {
-			// 	dt := fmt.Sprintf("%s=\"%s\"\n", key, value)
-			// 	b.WriteString(dt)
-			// }
 		}
 
 		c.String(http.StatusOK, b.String())
