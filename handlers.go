@@ -20,6 +20,11 @@ import (
 -- gracefull handling of zmb3/spotify errors
 like 403 lack of scope, unexpected endpoint etc.
 */
+type firestoreTrack struct {
+	Name     string    `firestore:"track_name"`
+	Artists  string    `firestore:"artists"`
+	PlayedAt time.Time `firestore:"played_at"`
+}
 
 const (
 	maxLists              = 5
@@ -38,12 +43,6 @@ var (
 	firestoreClient *firestore.Client
 )
 
-type firestoreTrack struct {
-	Name     string    `firestore:"track_name"`
-	Artists  string    `firestore:"artists"`
-	PlayedAt time.Time `firestore:"played_at"`
-}
-
 /* statefull authorization handler using channels
 state = calling endpoint (which is intended use of scope)
 caches client for as long as token is valid (1 hour for spotify)
@@ -58,6 +57,17 @@ func callback(c *gin.Context) {
 	if err != nil {
 		c.String(http.StatusForbidden, "Couldn't get token")
 		log.Panic(err)
+	} else { // save token in database
+		ctx := context.Background()
+		firestoreClient := initFirestoreDatabase(ctx)
+		defer firestoreClient.Close()
+		tokenID := strings.TrimPrefix(endpoint, "/")
+		_, err := firestoreClient.Collection("tokens").Doc(tokenID).Set(ctx, tok)
+		if err != nil {
+			log.Printf("/callback: Error saving token for endpoint %s %s", endpoint, err.Error())
+		} else {
+			log.Printf("/callback: Saved token for endpoint %s into Firestore", endpoint)
+		}
 	}
 	// create copy of gin.Context to be used inside the goroutine
 	// cCopy := c.Copy()

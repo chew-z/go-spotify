@@ -10,6 +10,7 @@ import (
 
 	"cloud.google.com/go/firestore"
 	"github.com/zmb3/spotify"
+	"golang.org/x/oauth2"
 	"google.golang.org/api/iterator"
 )
 
@@ -17,6 +18,7 @@ type songListenedAt struct {
 	Track   spotify.SimpleTrack
 	AddedAt string
 }
+
 type songData struct {
 	ID        string `json:"id"`
 	Title     string `json:"title"`
@@ -33,23 +35,75 @@ type recommendationParameters struct {
 	MinTrackCount   int
 }
 
+// type firestoreToken struct {
+// 	AccessToken  string    `firestore:"access_token"`
+// 	TokenType    string    `firestore:"token_type,omitempty"`
+// 	RefreshToken string    `firestore:"refresh_token"`
+// 	Expiry       time.Time `firestore:"expiry"`
+// }
+
 /* getClient - restore client for given endpoint/state from cache
 or return nil
 */
 func getClient(endpoint string) *spotify.Client {
 	if gclient, foundClient := kaszka.Get(endpoint); foundClient {
-		log.Printf("Cached client found for: %s", endpoint)
+		log.Printf("getClient: Cached client found for: %s", endpoint)
 		client := gclient.(*spotify.Client)
 		if tok, err := client.Token(); err != nil {
 			log.Panic(err)
 		} else {
-			log.Printf("Token will expire in %s", tok.Expiry.Sub(time.Now()).String())
+			log.Printf("getClient: Token will expire in %s", tok.Expiry.Sub(time.Now()).String())
 		}
 		return client
 	}
-	msg := fmt.Sprintf("No cached client found for: %s", endpoint)
-	log.Println(msg)
+	log.Printf("getClient: No cached client found for: %s", endpoint)
+	tok, err := getTokenFromDB(endpoint)
+	if err == nil {
+		client := auth.NewClient(tok)
+		kaszka.Set(endpoint, &client, tok.Expiry.Sub(time.Now()))
+		log.Printf("getClient: Cached client for: %s", endpoint)
+		if m, _ := time.ParseDuration("5m30s"); time.Until(tok.Expiry) < m {
+			newToken, _ := client.Token()
+			saveTokenToDB(endpoint, newToken)
+		}
+		return &client
+	}
 	return nil
+}
+
+func getTokenFromDB(endpoint string) (*oauth2.Token, error) {
+	ctx := context.Background() // reuse your context
+	firestoreClient := initFirestoreDatabase(ctx)
+	defer firestoreClient.Close()
+	tokenID := strings.TrimPrefix(endpoint, "/")
+	dsnap, err := firestoreClient.Collection("tokens").Doc(tokenID).Get(ctx)
+	if err != nil {
+		log.Printf("Error retrieving token from Firestore for endpoint %s %s.\nPossibly it ain't there..", endpoint, err.Error())
+		return nil, err
+	}
+	tok := &oauth2.Token{}
+	dsnap.DataTo(tok)
+	log.Printf("getTokenFromDB: Got token with expiration %s", tok.Expiry.In(location).Format("15:04:05"))
+	return tok, nil
+}
+
+func saveTokenToDB(endpoint string, token *oauth2.Token) {
+	ctx := context.Background() // reuse your context
+	firestoreClient := initFirestoreDatabase(ctx)
+	defer firestoreClient.Close()
+	tokenID := strings.TrimPrefix(endpoint, "/")
+	_, err := firestoreClient.Collection("tokens").Doc(tokenID).Set(ctx, map[string]interface{}{
+		"AccessToken":  token.AccessToken,
+		"Expiry":       token.Expiry,
+		"RefreshToken": token.RefreshToken,
+	}, firestore.MergeAll)
+
+	if err != nil {
+		log.Printf("refreshTokenFromDb: Error saving token for endpoint %s %s", endpoint, err.Error())
+	} else {
+		log.Printf("refreshTokenFromDb: Saved refreshed token for endpoint %s into Firestore", endpoint)
+	}
+
 }
 
 /* recommendFromHistory - (like recommendFromMood but latest tracks

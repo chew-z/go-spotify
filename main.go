@@ -43,5 +43,5 @@ func init() {
 	router.GET("/spot", spot)
 	router.GET("/analyze", analyze)
 
-	router.Run(":8080")
+	router.Run()
 }
