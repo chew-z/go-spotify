@@ -41,6 +41,11 @@ var (
 	clientChannel   = make(chan *spotify.Client)
 	redirectURI     = os.Getenv("REDIRECT_URI")
 	firestoreClient *firestore.Client
+	storeToken      = map[string]bool{
+		"/user":   true,
+		"/recent": true,
+		"/mood":   true,
+	}
 )
 
 /* statefull authorization handler using channels
@@ -58,15 +63,8 @@ func callback(c *gin.Context) {
 		c.String(http.StatusForbidden, "Couldn't get token")
 		log.Panic(err)
 	} else { // save token in database
-		ctx := context.Background()
-		firestoreClient := initFirestoreDatabase(ctx)
-		defer firestoreClient.Close()
-		tokenID := strings.TrimPrefix(endpoint, "/")
-		_, err := firestoreClient.Collection("tokens").Doc(tokenID).Set(ctx, tok)
-		if err != nil {
-			log.Printf("/callback: Error saving token for endpoint %s %s", endpoint, err.Error())
-		} else {
-			log.Printf("/callback: Saved token for endpoint %s into Firestore", endpoint)
+		if storeToken[endpoint] {
+			saveTokenToDB(endpoint, tok)
 		}
 	}
 	// create copy of gin.Context to be used inside the goroutine
@@ -260,7 +258,8 @@ func history(c *gin.Context) {
 }
 
 /* midnight - endpoint to clean tracks history from Cloud Firestore database
- */
+NOT USED - we keep tracks history for a time
+*/
 func midnight(c *gin.Context) {
 	ctx := context.Background()
 	firestoreClient := initFirestoreDatabase(ctx)
@@ -757,6 +756,7 @@ func moodFromHistory(c *gin.Context) {
 recommeded tracks could replace default mood playlist
 or any other (based on passed parameters)
 r=1 - replace, p=[ID]
+NOT USED - we are using moodFromHistory as handler
 */
 func mood(c *gin.Context) {
 	deuceCookie, _ := c.Cookie("deuce")

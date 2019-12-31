@@ -35,13 +35,6 @@ type recommendationParameters struct {
 	MinTrackCount   int
 }
 
-// type firestoreToken struct {
-// 	AccessToken  string    `firestore:"access_token"`
-// 	TokenType    string    `firestore:"token_type,omitempty"`
-// 	RefreshToken string    `firestore:"refresh_token"`
-// 	Expiry       time.Time `firestore:"expiry"`
-// }
-
 /* getClient - restore client for given endpoint/state from cache
 or return nil
 */
@@ -62,9 +55,11 @@ func getClient(endpoint string) *spotify.Client {
 		client := auth.NewClient(tok)
 		kaszka.Set(endpoint, &client, tok.Expiry.Sub(time.Now()))
 		log.Printf("getClient: Cached client for: %s", endpoint)
-		if m, _ := time.ParseDuration("5m30s"); time.Until(tok.Expiry) < m {
-			newToken, _ := client.Token()
-			saveTokenToDB(endpoint, newToken)
+		if storeToken[endpoint] {
+			if m, _ := time.ParseDuration("5m30s"); time.Until(tok.Expiry) < m {
+				newToken, _ := client.Token()
+				updateTokenInDB(endpoint, newToken)
+			}
 		}
 		return &client
 	}
@@ -92,18 +87,34 @@ func saveTokenToDB(endpoint string, token *oauth2.Token) {
 	firestoreClient := initFirestoreDatabase(ctx)
 	defer firestoreClient.Close()
 	tokenID := strings.TrimPrefix(endpoint, "/")
+	_, err := firestoreClient.Collection("tokens").Doc(tokenID).Set(ctx, token)
+
+	if err != nil {
+		log.Printf("saveToken: Error saving token for endpoint %s %s", endpoint, err.Error())
+	} else {
+		log.Printf("saveToken: Saved token for endpoint %s into Firestore", endpoint)
+		log.Printf("saveToken: Token expiration %s", token.Expiry.In(location).Format("15:04:05"))
+	}
+}
+
+func updateTokenInDB(endpoint string, token *oauth2.Token) {
+	ctx := context.Background() // reuse your context
+	firestoreClient := initFirestoreDatabase(ctx)
+	defer firestoreClient.Close()
+	tokenID := strings.TrimPrefix(endpoint, "/")
 	_, err := firestoreClient.Collection("tokens").Doc(tokenID).Set(ctx, map[string]interface{}{
 		"AccessToken":  token.AccessToken,
 		"Expiry":       token.Expiry,
 		"RefreshToken": token.RefreshToken,
+		"TokenType":    token.TokenType,
 	}, firestore.MergeAll)
 
 	if err != nil {
-		log.Printf("refreshTokenFromDb: Error saving token for endpoint %s %s", endpoint, err.Error())
+		log.Printf("updateToken: Error saving token for endpoint %s %s", endpoint, err.Error())
 	} else {
-		log.Printf("refreshTokenFromDb: Saved refreshed token for endpoint %s into Firestore", endpoint)
+		log.Printf("updateToken: Saved token for endpoint %s into Firestore", endpoint)
+		log.Printf("updateToken: Token expiration %s", token.Expiry.In(location).Format("15:04:05"))
 	}
-
 }
 
 /* recommendFromHistory - (like recommendFromMood but latest tracks
@@ -164,6 +175,9 @@ func recommendFromHistory(client *spotify.Client) ([]spotify.FullTrack, error) {
 	return recommendedTracks, nil
 }
 
+/* recommendFromMood - suggest new music based on recently playing tracks
+5 recent tracks and averaged attibutes of of recent tracks
+*/
 func recommendFromMood(client *spotify.Client) ([]spotify.FullTrack, error) {
 	recommendedTracks := []spotify.FullTrack{}
 	recentTracksIDs := []spotify.ID{}
@@ -204,6 +218,9 @@ func recommendFromMood(client *spotify.Client) ([]spotify.FullTrack, error) {
 	return recommendedTracks, nil
 }
 
+/* recommendFromTop - recommend music based on your top artists and
+averaged attributes of user's top tracks
+*/
 func recommendFromTop(client *spotify.Client) ([]spotify.FullTrack, error) {
 	tracks := []spotify.FullTrack{}
 	pageLimit := 5
@@ -247,6 +264,8 @@ func recommendFromTop(client *spotify.Client) ([]spotify.FullTrack, error) {
 	return tracks, nil
 }
 
+/* getTrackAttributes - return averaged attributes for set of tracks
+ */
 func getTrackAttributes(client *spotify.Client, tracks []spotify.FullTrack) (*spotify.TrackAttributes, error) {
 	var attributes *spotify.TrackAttributes
 
@@ -294,6 +313,9 @@ func getTrackAttributes(client *spotify.Client, tracks []spotify.FullTrack) (*sp
 	return attributes, nil
 }
 
+/* handleSearchResults - pretty print search results depending
+on search category (tracks, playlists, albums)
+*/
 func handleSearchResults(results *spotify.SearchResult) string {
 	var b strings.Builder
 	// handle album results
@@ -327,6 +349,8 @@ func handleSearchResults(results *spotify.SearchResult) string {
 	return b.String()
 }
 
+/* handleSearchResults - pretty print search results with acoustic attributes
+ */
 func handleAudioFeatures(results *spotify.SearchResult, client *spotify.Client) string {
 	var b strings.Builder
 
