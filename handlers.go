@@ -30,6 +30,7 @@ const (
 
 var (
 	countryPoland   = "PL"
+	location, _     = time.LoadLocation("Europe/Warsaw")
 	kaszka          = cache.New(60*time.Minute, 1*time.Minute)
 	auth            = spotify.NewAuthenticator(redirectURI, spotify.ScopeUserReadPrivate, spotify.ScopeUserTopRead, spotify.ScopeUserLibraryRead, spotify.ScopeUserFollowRead, spotify.ScopeUserReadRecentlyPlayed, spotify.ScopePlaylistModifyPublic, spotify.ScopePlaylistModifyPrivate)
 	clientChannel   = make(chan *spotify.Client)
@@ -38,9 +39,9 @@ var (
 )
 
 type firestoreTrack struct {
-	Name     string `firestore:"track_name"`
-	Artists  string `firestore:"artists"`
-	PlayedAt string `firestore:"played_at"`
+	Name     string    `firestore:"track_name"`
+	Artists  string    `firestore:"artists"`
+	PlayedAt time.Time `firestore:"played_at"`
 }
 
 /* statefull authorization handler using channels
@@ -180,20 +181,20 @@ func recent(c *gin.Context) {
 
 		ctx := context.Background()
 		firestoreClient := initFirestoreDatabase(ctx)
+		// Get a new write batch.
 		batch := firestoreClient.Batch()
 		defer firestoreClient.Close()
 
 		var b strings.Builder
 		b.WriteString("Recently Played :")
-		loc, _ := time.LoadLocation("Europe/Warsaw")
-		// Get a new write batch.
 		for _, item := range recentlyPlayed {
 			artists := joinArtists(item.Track.Artists, ", ")
-			playedAt := item.PlayedAt.In(loc).Format("15:04:05")
+			// playedAt := item.PlayedAt.In(loc).Format("15:04:05")
+			playedAt := item.PlayedAt
 
 			b.WriteString("\n- ")
 			b.WriteString(" [ ")
-			b.WriteString(playedAt)
+			b.WriteString(playedAt.In(location).Format("15:04:05"))
 			b.WriteString(" ] ")
 			b.WriteString(item.Track.Name)
 			b.WriteString(" --  ")
@@ -217,7 +218,7 @@ func recent(c *gin.Context) {
 	}()
 }
 
-/* restore - read saved tracks from Cloud Firestore database
+/* history - read saved tracks from Cloud Firestore database
  */
 func history(c *gin.Context) {
 	ctx := context.Background()
@@ -233,17 +234,64 @@ func history(c *gin.Context) {
 		if err == iterator.Done {
 			break
 		}
+		// log.Println(doc.Ref.ID) get TrackIDs, must be after iterator.Done otherwise we hit nil pointer
 		if err != nil {
 			log.Println(err.Error())
 		}
 		if err := doc.DataTo(&tr); err != nil {
 			log.Println(err.Error())
 		} else {
-			b.WriteString(fmt.Sprintf("[ %s ] %s -- %s\n", tr.PlayedAt, tr.Name, tr.Artists))
+			b.WriteString(fmt.Sprintf("[ %s ] %s -- %s\n", tr.PlayedAt.In(location).Format("15:04:05"), tr.Name, tr.Artists))
 		}
 	}
 
 	c.String(http.StatusOK, b.String())
+
+}
+
+/* midnight - endpoint to clean tracks history from Cloud Firestore database
+ */
+func midnight(c *gin.Context) {
+	ctx := context.Background()
+	firestoreClient := initFirestoreDatabase(ctx)
+	defer firestoreClient.Close()
+	batchSize := 20
+	ref := firestoreClient.Collection("recently_played")
+	for {
+		// Get a batch of documents
+		iter := ref.Limit(batchSize).Documents(ctx)
+		numDeleted := 0
+
+		// Iterate through the documents, adding
+		// a delete operation for each one to a
+		// WriteBatch.
+		batch := firestoreClient.Batch()
+		for {
+			doc, err := iter.Next()
+			if err == iterator.Done {
+				break
+			}
+			if err != nil {
+				log.Println(err.Error())
+			}
+
+			batch.Delete(doc.Ref)
+			numDeleted++
+		}
+
+		// If there are no documents to delete,
+		// the process is over.
+		if numDeleted == 0 {
+			break
+		}
+
+		_, err := batch.Commit(ctx)
+		if err != nil {
+			log.Println(err.Error())
+		}
+	}
+
+	c.String(http.StatusOK, "Midnight Run - starring Robert DeNiro")
 
 }
 
@@ -619,6 +667,69 @@ func spot(c *gin.Context) {
 				log.Println("Tracks added")
 			} else {
 				log.Println(err)
+			}
+		} else {
+			b.WriteString("Printing only, pass params (r=1, p=playlistID) if you wish to replace with recommended tracks\n")
+		}
+		for _, item := range spotTracks {
+			b.WriteString(fmt.Sprintf("  %s - %s : %s (%d)\n", item.ID, item.Name, joinArtists(item.Artists, ", "), item.Popularity))
+		}
+
+		c.String(http.StatusOK, b.String())
+	}()
+}
+
+/* moodFromHistory - recommends tracks based on current mood
+(recently played tracks) [Firestore version]
+recommeded tracks could replace default mood playlist
+or any other (based on passed parameters)
+r=1 - replace, p=[ID]
+*/
+func moodFromHistory(c *gin.Context) {
+	deuceCookie, _ := c.Cookie("deuce")
+	endpoint := c.Request.URL.Path
+	client := getClient(endpoint)
+	log.Printf("Deuce: %s ", deuceCookie)
+	replaceCookie, cookieErr := c.Cookie("replace_playlist")
+	playlistCookie, _ := c.Cookie("playlist_ID")
+	if cookieErr != nil {
+		c.SetCookie("replace_playlist", c.Query("r"), cookieLifetime, endpoint, "", false, true)
+		c.SetCookie("playlist_ID", c.DefaultQuery("p", defaultMoodPlaylistID), cookieLifetime, endpoint, "", false, true)
+	}
+	log.Printf("Cookie values: %s %s \n", replaceCookie, playlistCookie)
+
+	if client == nil { // get client from oauth
+		if deuceCookie == "1" { // wait for auth to complete
+			client = <-clientChannel
+			log.Printf("%s: Login Completed!", endpoint)
+		} else { // redirect to auth URL and exit
+			url := auth.AuthURL(endpoint)
+			log.Printf("%s: redirecting to %s", endpoint, url)
+			// HTTP standard does not pass through HTTP headers on an 302/301 directive
+			// 303 is never cached and always is GET
+			c.Redirect(303, url)
+			return
+		}
+	}
+	defer func() {
+		spotTracks, err := recommendFromHistory(client)
+		if err != nil {
+			log.Println(err.Error())
+			c.String(http.StatusNotFound, err.Error())
+			return
+		}
+		var b strings.Builder
+		b.WriteString("Recommended tracks based on recently listened to\n")
+		replace := c.DefaultQuery("r", replaceCookie)
+		playlist := c.DefaultQuery("p", playlistCookie)
+		if replace == "1" {
+			recommendedPlaylistID := spotify.ID(playlist)
+			chunks := chunkIDs(getSpotifyIDs(spotTracks), 100)
+			err = client.ReplacePlaylistTracks(recommendedPlaylistID, chunks[0]...)
+			if err == nil {
+				log.Println("Tracks added")
+			} else {
+				log.Println(err.Error())
 			}
 		} else {
 			b.WriteString("Printing only, pass params (r=1, p=playlistID) if you wish to replace with recommended tracks\n")

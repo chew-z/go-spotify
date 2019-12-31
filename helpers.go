@@ -1,13 +1,16 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"strconv"
 	"strings"
 	"time"
 
+	"cloud.google.com/go/firestore"
 	"github.com/zmb3/spotify"
+	"google.golang.org/api/iterator"
 )
 
 type songListenedAt struct {
@@ -30,7 +33,7 @@ type recommendationParameters struct {
 	MinTrackCount   int
 }
 
-/* getClient - restore client for given state from cache
+/* getClient - restore client for given endpoint/state from cache
 or return nil
 */
 func getClient(endpoint string) *spotify.Client {
@@ -47,6 +50,64 @@ func getClient(endpoint string) *spotify.Client {
 	msg := fmt.Sprintf("No cached client found for: %s", endpoint)
 	log.Println(msg)
 	return nil
+}
+
+/* recommendFromHistory - (like recommendFromMood but latest tracks
+are taken from Firebase store (unique tracks etc.)
+TODO - add limit as parameter (short, medium, long)
+*/
+func recommendFromHistory(client *spotify.Client) ([]spotify.FullTrack, error) {
+	recommendedTracks := []spotify.FullTrack{}
+	recentTracksIDs := []spotify.ID{}
+	ctx := context.Background()
+	firestoreClient := initFirestoreDatabase(ctx)
+	defer firestoreClient.Close()
+	iter := firestoreClient.Collection("recently_played").OrderBy("played_at", firestore.Desc).Limit(24).Documents(ctx)
+	var tr firestoreTrack
+	// fiil in recentTracksIDs
+	for {
+		doc, err := iter.Next()
+		if err == iterator.Done {
+			break
+		}
+		// log.Println(doc.Ref.ID) get TrackIDs, must be after iterator.Done otherwise we hit nil pointer
+		if err != nil {
+			log.Println(err.Error())
+			return recommendedTracks, err
+		}
+		recentTracksIDs = append(recentTracksIDs, spotify.ID(doc.Ref.ID))
+		if err := doc.DataTo(&tr); err != nil {
+			log.Println(err.Error())
+			return recommendedTracks, err
+		}
+	}
+	// get full tracks for track IDs
+	recentTracks, err := fullTrackGetMany(client, recentTracksIDs)
+	if err != nil {
+		return recommendedTracks, err
+	}
+	// get attributes for tracks
+	trackAttributes, err := getTrackAttributes(client, recentTracks)
+	if err != nil {
+		return recommendedTracks, err
+	}
+	// modern tracks not oldies, seed by recent 5 tracks and average attributes of retrieved tracks (24)
+	params := recommendationParameters{
+		FromYear:      1999,
+		MinTrackCount: 20,
+		Seeds: spotify.Seeds{
+			Tracks: recentTracksIDs[0:4],
+		},
+		TrackAttributes: trackAttributes,
+	}
+
+	pageTracks, err := getRecommendedTracks(client, params)
+	if err != nil {
+		return recommendedTracks, err
+	}
+	recommendedTracks = append(recommendedTracks, pageTracks...)
+
+	return recommendedTracks, nil
 }
 
 func recommendFromMood(client *spotify.Client) ([]spotify.FullTrack, error) {
