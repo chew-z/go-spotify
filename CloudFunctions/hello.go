@@ -13,11 +13,16 @@ func HelloHTTP(w http.ResponseWriter, r *http.Request) {
 
 func newMux() *http.ServeMux {
 	mux := http.NewServeMux()
+	mux.HandleFunc("/", zero)
 	mux.HandleFunc("/one", one)
 	mux.HandleFunc("/two", two)
 	mux.HandleFunc("/three", three)
 
 	return mux
+}
+
+func zero(w http.ResponseWriter, r *http.Request) {
+	w.Write([]byte("hello from /"))
 }
 
 func one(w http.ResponseWriter, r *http.Request) {
