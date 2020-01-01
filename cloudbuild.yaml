@@ -1,0 +1,3 @@
+steps:
+- name: 'gcr.io/cloud-builders/gcloud'
+  args: ['functions', 'deploy', 'HelloHTTP', '--trigger-http', '--runtime', 'go111', '--entry-point', 'HelloHTTP']
