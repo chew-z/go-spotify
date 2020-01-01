@@ -24,6 +24,7 @@ type firestoreTrack struct {
 	Name     string    `firestore:"track_name"`
 	Artists  string    `firestore:"artists"`
 	PlayedAt time.Time `firestore:"played_at"`
+	Count    int       `firestore:"count,omitempty"`
 }
 
 const (
@@ -213,8 +214,10 @@ func recent(c *gin.Context) {
 				"played_at":  playedAt,
 				"track_name": item.Track.Name,
 				"artists":    artists,
+				// "count":      firestore.Increment(1), // TODO - repeated /recent call increases count messing results
+				// if we stop playing and keep updating with /recent we create a winner ..
+				// but each other solution is transactional
 			}, firestore.MergeAll) // Overwrite only the fields in the map; preserve all others.
-
 		}
 		// Commit the batch.
 		_, errBatch := batch.Commit(ctx)
@@ -250,6 +253,7 @@ func history(c *gin.Context) {
 			log.Println(err.Error())
 		} else {
 			b.WriteString(fmt.Sprintf("[ %s ] %s -- %s\n", tr.PlayedAt.In(location).Format("15:04:05"), tr.Name, tr.Artists))
+			// b.WriteString(fmt.Sprintf("[ %s ] (%d) %s -- %s\n", tr.PlayedAt.In(location).Format("15:04:05"), tr.Count, tr.Name, tr.Artists))
 		}
 	}
 
