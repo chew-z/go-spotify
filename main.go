@@ -30,6 +30,7 @@ func init() {
 	router.GET("/top", top)
 	router.GET("/recent", recent)
 	router.GET("/history", history)
+	router.GET("/popular", popular)
 	// router.GET("/midnight", midnight)
 	router.GET("/tracks", tracks)
 	router.GET("/playlists", playlists)

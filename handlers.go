@@ -24,7 +24,9 @@ type firestoreTrack struct {
 	Name     string    `firestore:"track_name"`
 	Artists  string    `firestore:"artists"`
 	PlayedAt time.Time `firestore:"played_at"`
-	Count    int       `firestore:"count,omitempty"`
+}
+type popularTrack struct {
+	Count int `firestore:"count,omitempty"`
 }
 
 const (
@@ -253,12 +255,72 @@ func history(c *gin.Context) {
 			log.Println(err.Error())
 		} else {
 			b.WriteString(fmt.Sprintf("[ %s ] %s -- %s\n", tr.PlayedAt.In(location).Format("15:04:05"), tr.Name, tr.Artists))
-			// b.WriteString(fmt.Sprintf("[ %s ] (%d) %s -- %s\n", tr.PlayedAt.In(location).Format("15:04:05"), tr.Count, tr.Name, tr.Artists))
 		}
 	}
 
 	c.String(http.StatusOK, b.String())
 
+}
+
+/* popular - read counter of how many tracks has been played from Firestore
+and get us sorted list of most popular tracks.
+I see three different ways of doing it:
+1) getting tracks from firestore without calling Spotify API at all
+2) with single call to Spotify API and two loops - GetTracks(ids ...ID)
+3) with single loop and multiple calls to Spotify API - GetTrack(id ID)
+*/
+func popular(c *gin.Context) {
+	endpoint := c.Request.URL.Path
+	client := getClient(endpoint)
+	deuceCookie, _ := c.Cookie("deuce")
+	log.Printf("Deuce: %s ", deuceCookie)
+	if client == nil { // get client from oauth
+		if deuceCookie == "1" { // wait for auth to complete
+			client = <-clientChannel
+			log.Printf("%s: Login Completed!", endpoint)
+		} else { // redirect to auth URL and exit
+			url := auth.AuthURL(endpoint)
+			log.Printf("%s: redirecting to %s", endpoint, url)
+			// HTTP standard does not pass through HTTP headers on an 302/301 directive
+			// 303 is never cached and always is GET
+			c.Redirect(303, url)
+			return
+		}
+	}
+	defer func() {
+		ctx := context.Background()
+		firestoreClient := initFirestoreDatabase(ctx)
+		defer firestoreClient.Close()
+		var b strings.Builder
+		b.WriteString("Popular Tracks:\n")
+		pops := firestoreClient.Collection("popular_tracks").OrderBy("count", firestore.Desc).Limit(50).Documents(ctx)
+		var pt popularTrack
+		toplist := []int{}
+		trackIDs := []spotify.ID{}
+		for {
+			doc, err := pops.Next()
+			if err == iterator.Done {
+				break
+			}
+			if err != nil {
+				log.Println(err.Error())
+			}
+			trackID := spotify.ID(doc.Ref.ID)
+			if err := doc.DataTo(&pt); err != nil {
+				log.Println(err.Error())
+			}
+			toplist = append(toplist, pt.Count)
+			trackIDs = append(trackIDs, trackID)
+		}
+		topTracks, err := fullTrackGetMany(client, trackIDs)
+		if err != nil {
+			log.Println(err.Error())
+		}
+		for i := range toplist {
+			b.WriteString(fmt.Sprintf("[ %d ] %s -- %s\n", toplist[i], topTracks[i].Name, joinArtists(topTracks[i].Artists, ", ")))
+		}
+		c.String(http.StatusOK, b.String())
+	}()
 }
 
 /* midnight - endpoint to clean tracks history from Cloud Firestore database
