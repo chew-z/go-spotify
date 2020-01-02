@@ -50,18 +50,20 @@ func getClient(endpoint string) *spotify.Client {
 		return client
 	}
 	log.Printf("getClient: No cached client found for: %s", endpoint)
-	tok, err := getTokenFromDB(endpoint)
-	if err == nil {
-		client := auth.NewClient(tok)
-		kaszka.Set(endpoint, &client, tok.Expiry.Sub(time.Now()))
-		log.Printf("getClient: Cached client for: %s", endpoint)
-		if storeToken[endpoint] {
-			if m, _ := time.ParseDuration("5m30s"); time.Until(tok.Expiry) < m {
-				newToken, _ := client.Token()
-				updateTokenInDB(endpoint, newToken)
+	if storeToken[endpoint] { // token is only stored in database for few endpoints
+		tok, err := getTokenFromDB(endpoint)
+		if err == nil {
+			client := auth.NewClient(tok)
+			kaszka.Set(endpoint, &client, tok.Expiry.Sub(time.Now()))
+			log.Printf("getClient: Cached client for: %s", endpoint)
+			if storeToken[endpoint] {
+				if m, _ := time.ParseDuration("5m30s"); time.Until(tok.Expiry) < m {
+					newToken, _ := client.Token()
+					updateTokenInDB(endpoint, newToken)
+				}
 			}
+			return &client
 		}
-		return &client
 	}
 	return nil
 }
