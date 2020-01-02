@@ -48,7 +48,7 @@ type FirestoreValue struct {
 // }
 
 // GCLOUD_PROJECT is automatically set by the Cloud Functions runtime.
-var projectID = os.Getenv("GCLOUD_PROJECT")
+var projectID = os.Getenv("GOOGLE_CLOUD_PROJECT")
 
 // client is a Firestore client, reused between function invocations.
 // TODO - above is exact example from https://cloud.google.com/functions/docs/calling/cloud-firestore
@@ -87,7 +87,7 @@ func HelloFirestore(ctx context.Context, e FirestoreEvent) error {
 	pathParts := strings.Split(fullPath, "/")
 	// collection := pathParts[0]
 	doc := strings.Join(pathParts[1:], "/") // aka track.ID
-	log.Println(doc)
+	log.Printf("track.ID aka document: %s", doc)
 	// In order to avoid triggering infinite loop we keep counters in separate collection
 	docRef := firestoreClient.Collection("popular_tracks").Doc(doc)
 	_, err := docRef.Set(ctx, map[string]interface{}{
