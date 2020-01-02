@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"cloud.google.com/go/firestore"
-	"cloud.google.com/go/functions/metadata"
 	firebase "firebase.google.com/go"
 )
 
@@ -52,17 +51,15 @@ type FirestoreValue struct {
 var projectID = os.Getenv("GCLOUD_PROJECT")
 
 // client is a Firestore client, reused between function invocations.
+// TODO - above is exact example from https://cloud.google.com/functions/docs/calling/cloud-firestore
+// Shall we believe in persistence here !?
 var firestoreClient *firestore.Client
-
-//TODO - it works as advertised! it is also useless and dangerous as it creates infinite loop
 
 func init() {
 	// Use the application default credentials.
 	conf := &firebase.Config{ProjectID: projectID}
-
 	// Use context.Background() because the app/client should persist across invocations.
 	ctx := context.Background()
-
 	app, err := firebase.NewApp(ctx, conf)
 	if err != nil {
 		log.Fatalf("firebase.NewApp: %v", err)
@@ -76,24 +73,24 @@ func init() {
 
 // HelloFirestore is triggered by a change to a Firestore document.
 func HelloFirestore(ctx context.Context, e FirestoreEvent) error {
-	meta, err := metadata.FromContext(ctx)
-	if err != nil {
-		return fmt.Errorf("metadata.FromContext: %v", err)
-	}
+	// meta, err := metadata.FromContext(ctx)
+	// if err != nil {
+	// 	return fmt.Errorf("metadata.FromContext: %v", err)
+	// }
 
-	log.Printf("Function triggered by change to: %v", meta.Resource)
-	log.Printf("Old value: %+v", e.OldValue)
-	log.Printf("New value: %+v", e.Value)
+	// log.Printf("Function triggered by change to: %v", meta.Resource)
+	// log.Printf("Old value: %+v", e.OldValue)
+	// log.Printf("New value: %+v", e.Value)
 
 	fullPath := strings.Split(e.Value.Name, "/documents/")[1]
-	log.Println(fullPath)
+	// log.Println(fullPath)
 	pathParts := strings.Split(fullPath, "/")
 	// collection := pathParts[0]
 	doc := strings.Join(pathParts[1:], "/") // aka track.ID
 	log.Println(doc)
 	// In order to avoid triggering infinite loop we keep counters in separate collection
 	docRef := firestoreClient.Collection("popular_tracks").Doc(doc)
-	w, err := docRef.Set(ctx, map[string]interface{}{
+	_, err := docRef.Set(ctx, map[string]interface{}{
 		"count": firestore.Increment(1)}, firestore.MergeAll)
 	// w, err := docRef.Update(ctx, []firestore.Update{
 	// 	{Path: "count", Value: firestore.Increment(1)},
@@ -106,6 +103,6 @@ func HelloFirestore(ctx context.Context, e FirestoreEvent) error {
 		log.Println(err.Error())
 		return fmt.Errorf("beancounter: %v", err)
 	}
-	log.Println(w.UpdateTime)
+	// log.Println(w.UpdateTime)
 	return nil
 }
