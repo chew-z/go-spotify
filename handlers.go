@@ -242,6 +242,7 @@ func history(c *gin.Context) {
 	// iter := firestoreClient.Collection("recently_played").Documents(ctx)
 	iter := firestoreClient.Collection("recently_played").OrderBy("played_at", firestore.Desc).Limit(100).Documents(ctx)
 	var tr firestoreTrack
+	var tracks []firestoreTrack
 	for {
 		doc, err := iter.Next()
 		if err == iterator.Done {
@@ -254,11 +255,23 @@ func history(c *gin.Context) {
 		if err := doc.DataTo(&tr); err != nil {
 			log.Println(err.Error())
 		} else {
-			b.WriteString(fmt.Sprintf("[ %s ] %s -- %s\n", tr.PlayedAt.In(location).Format("15:04:05"), tr.Name, tr.Artists))
+			tracks = append(tracks, tr)
+			// b.WriteString(fmt.Sprintf("[ %s ] %s -- %s\n", tr.PlayedAt.In(location).Format("15:04:05"), tr.Name, tr.Artists))
 		}
 	}
-
-	c.String(http.StatusOK, b.String())
+	// Call the HTML method of the Context to render a template
+	c.HTML(
+		// Set the HTTP status to 200 (OK)
+		http.StatusOK,
+		// Use the index.html template
+		"history.html",
+		// Pass the data that the page uses (in this case, 'title')
+		gin.H{
+			"Tracks": tracks,
+			"title":  "Recently Played",
+		},
+	)
+	// c.String(http.StatusOK, b.String())
 
 }
 

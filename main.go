@@ -19,7 +19,11 @@ func main() {
 
 func init() {
 	router := gin.Default()
-	router.Use(favicon.New("./favicon.png"))
+	router.Use(favicon.New("./favicon.ico"))
+
+	// Process the templates at the start so that they don't have to be loaded
+	// from the disk again. This makes serving HTML pages very fast.
+	router.LoadHTMLGlob("templates/*")
 
 	router.GET("/", func(c *gin.Context) {
 		c.String(http.StatusOK, "Hello World! This is go-spotify here.")
