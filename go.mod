@@ -4,6 +4,7 @@ go 1.13
 
 require (
 	cloud.google.com/go/firestore v1.1.0
+	firebase.google.com/go v3.11.1+incompatible // indirect
 	github.com/gin-gonic/gin v1.5.0
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/thinkerou/favicon v0.1.0

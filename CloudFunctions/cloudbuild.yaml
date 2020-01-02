@@ -1,4 +1,7 @@
 steps:
 - name: 'gcr.io/cloud-builders/gcloud'
-  args: ['functions', 'deploy', 'HelloHTTP', '--trigger-http', '--runtime', 'go111', '--entry-point', 'HelloHTTP', '--region', 'europe-west1']
+  args: ['functions', 'deploy', 'HelloFirestore','--runtime', 'go111', '--region', 'europe-west1', '--timeout', '2s', '--trigger-event', 'providers/cloud.firestore/eventTypes/document.update', '--trigger-resource', 'projects/go-spotify-262707/databases/(default)/documents/recently_played/{played_at}']
   dir: 'CloudFunctions'
+
+
+  # gcloud functions deploy HelloFirestore --runtime go111 --region=europe-west1 --timeout 2s --trigger-event providers/cloud.firestore/eventTypes/document.update --trigger-resource projects/go-spotify-262707/databases/(default)/documents/recently_played/{played_at}
