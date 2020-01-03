@@ -42,7 +42,7 @@ func init() {
 	router.GET("/artists", artists)
 
 	router.GET("/search", search)
-	// router.GET("/mood", mood)
+	router.GET("/oldmood", mood)
 	router.GET("/mood", moodFromHistory)
 	router.GET("/recommend", recommend)
 	router.GET("/spot", spot)

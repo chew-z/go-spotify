@@ -837,8 +837,6 @@ func moodFromHistory(c *gin.Context) {
 			c.String(http.StatusNotFound, err.Error())
 			return
 		}
-		var b strings.Builder
-		b.WriteString("Recommended tracks based on recently listened to\n")
 		replace := c.DefaultQuery("r", replaceCookie)
 		playlist := c.DefaultQuery("p", playlistCookie)
 		if replace == "1" {
@@ -850,14 +848,32 @@ func moodFromHistory(c *gin.Context) {
 			} else {
 				log.Println(err.Error())
 			}
-		} else {
-			b.WriteString("Printing only, pass params (r=1, p=playlistID) if you wish to replace with recommended tracks\n")
 		}
+		type topTrack struct {
+			Name    string
+			Album   string
+			Artists string
+			URL     string
+			Image   string
+		}
+		var tt topTrack
+		var tracks []topTrack
 		for _, item := range spotTracks {
-			b.WriteString(fmt.Sprintf("  %s - %s : %s (%d)\n", item.ID, item.Name, joinArtists(item.Artists, ", "), item.Popularity))
+			tt.Name = item.Name
+			tt.Album = item.Album.Name
+			tt.Artists = joinArtists(item.Artists, ", ")
+			tt.URL = item.ExternalURLs["spotify"]
+			tt.Image = item.Album.Images[1].URL
+			tracks = append(tracks, tt)
 		}
-
-		c.String(http.StatusOK, b.String())
+		c.HTML(
+			http.StatusOK,
+			"mood.html",
+			gin.H{
+				"Tracks": tracks,
+				"title":  "Mood",
+			},
+		)
 	}()
 }
 
@@ -901,8 +917,6 @@ func mood(c *gin.Context) {
 			c.String(http.StatusNotFound, err.Error())
 			return
 		}
-		var b strings.Builder
-		b.WriteString("Recommended tracks based on recently listened to\n")
 		replace := c.DefaultQuery("r", replaceCookie)
 		playlist := c.DefaultQuery("p", playlistCookie)
 		if replace == "1" {
@@ -914,13 +928,31 @@ func mood(c *gin.Context) {
 			} else {
 				log.Println(err.Error())
 			}
-		} else {
-			b.WriteString("Printing only, pass params (r=1, p=playlistID) if you wish to replace with recommended tracks\n")
 		}
+		type topTrack struct {
+			Name    string
+			Album   string
+			Artists string
+			URL     string
+			Image   string
+		}
+		var tt topTrack
+		var tracks []topTrack
 		for _, item := range spotTracks {
-			b.WriteString(fmt.Sprintf("  %s - %s : %s (%d)\n", item.ID, item.Name, joinArtists(item.Artists, ", "), item.Popularity))
+			tt.Name = item.Name
+			tt.Album = item.Album.Name
+			tt.Artists = joinArtists(item.Artists, ", ")
+			tt.URL = item.ExternalURLs["spotify"]
+			tt.Image = item.Album.Images[1].URL
+			tracks = append(tracks, tt)
 		}
-
-		c.String(http.StatusOK, b.String())
+		c.HTML(
+			http.StatusOK,
+			"mood.html",
+			gin.H{
+				"Tracks": tracks,
+				"title":  "Mood",
+			},
+		)
 	}()
 }
