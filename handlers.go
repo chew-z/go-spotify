@@ -32,6 +32,7 @@ type popularTrack struct {
 const (
 	maxLists              = 5
 	maxTracks             = 5
+	pageLimit             = 25
 	cookieLifetime        = 10
 	defaultMoodPlaylistID = "7vUhitas9hJkonwMx5t0z5"
 )
@@ -150,6 +151,8 @@ func top(c *gin.Context) {
 			Name    string
 			Album   string
 			Artists string
+			URL     string
+			Image   string
 		}
 		var tt topTrack
 		var tracks []topTrack
@@ -157,6 +160,8 @@ func top(c *gin.Context) {
 			tt.Name = item.Name
 			tt.Album = item.Album.Name
 			tt.Artists = joinArtists(item.Artists, ", ")
+			tt.URL = item.ExternalURLs["spotify"]
+			tt.Image = item.Album.Images[1].URL
 			tracks = append(tracks, tt)
 		}
 		c.HTML(
@@ -247,7 +252,7 @@ func history(c *gin.Context) {
 	ctx := context.Background()
 	firestoreClient := initFirestoreDatabase(ctx)
 	defer firestoreClient.Close()
-	iter := firestoreClient.Collection("recently_played").OrderBy("played_at", firestore.Desc).Limit(100).Documents(ctx)
+	iter := firestoreClient.Collection("recently_played").OrderBy("played_at", firestore.Desc).Limit(pageLimit).Documents(ctx)
 	var tr firestoreTrack
 	var tracks []firestoreTrack
 	for {
@@ -310,12 +315,14 @@ func popular(c *gin.Context) {
 		defer firestoreClient.Close()
 		var b strings.Builder
 		b.WriteString("Popular Tracks:\n")
-		pops := firestoreClient.Collection("popular_tracks").OrderBy("count", firestore.Desc).Limit(50).Documents(ctx)
+		pops := firestoreClient.Collection("popular_tracks").OrderBy("count", firestore.Desc).Limit(pageLimit).Documents(ctx)
 		var pt popularTrack
 		type toptrack struct {
 			Count   int
 			Name    string
 			Artists string
+			URL     string
+			Image   string
 		}
 		var tracks []toptrack
 		var toplist []int
@@ -344,22 +351,19 @@ func popular(c *gin.Context) {
 			tt.Count = toplist[i]
 			tt.Name = topTracks[i].Name
 			tt.Artists = joinArtists(topTracks[i].Artists, ", ")
+			tt.URL = topTracks[i].ExternalURLs["spotify"]
+			tt.Image = topTracks[i].Album.Images[1].URL
 			tracks = append(tracks, tt)
-			// b.WriteString(fmt.Sprintf("[ %d ] %s -- %s\n", toplist[i], topTracks[i].Name, joinArtists(topTracks[i].Artists, ", ")))
 		}
 		// Call the HTML method of the Context to render a template
 		c.HTML(
-			// Set the HTTP status to 200 (OK)
 			http.StatusOK,
-			// Use the index.html template
 			"popular.html",
-			// Pass the data that the page uses (in this case, 'title')
 			gin.H{
 				"Tracks": tracks,
 				"title":  "Popular tracks",
 			},
 		)
-		// c.String(http.StatusOK, b.String())
 	}()
 }
 
@@ -775,7 +779,7 @@ func spot(c *gin.Context) {
 		playlist := c.DefaultQuery("p", playlistCookie)
 		if replace == "1" {
 			recommendedPlaylistID := spotify.ID(playlist)
-			chunks := chunkIDs(getSpotifyIDs(spotTracks), 100)
+			chunks := chunkIDs(getSpotifyIDs(spotTracks), pageLimit)
 			err = client.ReplacePlaylistTracks(recommendedPlaylistID, chunks[0]...)
 
 			if err == nil {
@@ -839,7 +843,7 @@ func moodFromHistory(c *gin.Context) {
 		playlist := c.DefaultQuery("p", playlistCookie)
 		if replace == "1" {
 			recommendedPlaylistID := spotify.ID(playlist)
-			chunks := chunkIDs(getSpotifyIDs(spotTracks), 100)
+			chunks := chunkIDs(getSpotifyIDs(spotTracks), pageLimit)
 			err = client.ReplacePlaylistTracks(recommendedPlaylistID, chunks[0]...)
 			if err == nil {
 				log.Println("Tracks added")
@@ -903,7 +907,7 @@ func mood(c *gin.Context) {
 		playlist := c.DefaultQuery("p", playlistCookie)
 		if replace == "1" {
 			recommendedPlaylistID := spotify.ID(playlist)
-			chunks := chunkIDs(getSpotifyIDs(spotTracks), 100)
+			chunks := chunkIDs(getSpotifyIDs(spotTracks), pageLimit)
 			err = client.ReplacePlaylistTracks(recommendedPlaylistID, chunks[0]...)
 			if err == nil {
 				log.Println("Tracks added")

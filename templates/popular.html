@@ -9,15 +9,24 @@
 <!-- </p> -->
 <h4 class="display-4">{{ .title }}</h4>
 <div class="container">
-    {{range .Tracks }}
-    <div class="card">
-        <div class="card-body">
-            <p class="card-text">[{{.Count}}] 
-            {{with .Name}}<strong>{{.}}</strong>{{end}} 
-            <em>{{.Artists}}</em></p>
+    <div class="embed-responsive"> 
+        <div class="card-columns">
+            {{range .Tracks }}
+            <div class="card" style="width: 20vw;">
+                <div class="card-header"> 
+                    <h6>{{ .Count }}</h6>
+                </div>
+                <a href="{{ .URL }}">
+                    <img class="card-img-top" style="width: 100%; height: auto; object-fit: cover;" src="{{ .Image }}" alt="{{ .Name }}">
+                </a>
+                <div class="card-body"> 
+                    <p class="card-text"><strong><a href="{{ .URL }}">{{ .Name }}</a></strong>
+                    <em>{{.Artists}}</em></p>
+                </div>
+            </div>
+            {{end}}
         </div>
     </div>
-    {{end}}
 </div>
 <!--Embed the footer.html template at this location-->
 {{ template "footer.html" .}}

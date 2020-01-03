@@ -16,7 +16,6 @@ import (
 )
 
 func initFirestoreDatabase(ctx context.Context) *firestore.Client {
-	// conf := &firebase.Config{ProjectID: os.Getenv("GOOGLE_CLOUD_PROJECT")}
 	sa := option.WithCredentialsFile(".firebase-credentials.json")
 	firestoreClient, err := firestore.NewClient(ctx, os.Getenv("GOOGLE_CLOUD_PROJECT"), sa)
 	if err != nil {
@@ -26,10 +25,10 @@ func initFirestoreDatabase(ctx context.Context) *firestore.Client {
 }
 
 func getRecommendedTracks(client *spotify.Client, params recommendationParameters) ([]spotify.FullTrack, error) {
-	pageLimit := 50
+	limit := pageLimit
 	tracks := []spotify.FullTrack{}
 	options := spotify.Options{
-		Limit:   &pageLimit,
+		Limit:   &limit,
 		Country: &countryPoland,
 	}
 
@@ -54,7 +53,6 @@ func getRecommendedTracks(client *spotify.Client, params recommendationParameter
 }
 
 func fullTrackGetMany(client *spotify.Client, ids []spotify.ID) ([]spotify.FullTrack, error) {
-	pageLimit := 50
 	tracks := []spotify.FullTrack{}
 
 	if len(ids) == 0 {

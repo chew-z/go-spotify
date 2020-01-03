@@ -225,8 +225,8 @@ averaged attributes of user's top tracks
 */
 func recommendFromTop(client *spotify.Client) ([]spotify.FullTrack, error) {
 	tracks := []spotify.FullTrack{}
-	pageLimit := 5
-	userTopArtists, err := client.CurrentUsersTopArtistsOpt(&spotify.Options{Limit: &pageLimit})
+	limit := 5
+	userTopArtists, err := client.CurrentUsersTopArtistsOpt(&spotify.Options{Limit: &limit})
 	if err != nil {
 		return tracks, fmt.Errorf("Failed to get user's top artists: %v", err)
 	}
@@ -246,7 +246,7 @@ func recommendFromTop(client *spotify.Client) ([]spotify.FullTrack, error) {
 
 		params := recommendationParameters{
 			FromYear:      1999,
-			MinTrackCount: 100,
+			MinTrackCount: pageLimit,
 			Seeds: spotify.Seeds{
 				Artists: []spotify.ID{artist.ID},
 			},
