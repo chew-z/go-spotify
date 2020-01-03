@@ -18,7 +18,6 @@ func main() {
 
 func init() {
 	router := gin.Default()
-	// router.Use(favicon.New("./favicon.ico"))
 	router.Static("/static", "./static")
 	router.StaticFile("/favicon.ico", "./favicon.ico")
 	// Process the templates at the start so that they don't have to be loaded
