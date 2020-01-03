@@ -12,12 +12,12 @@
     <div class="embed-responsive"> 
         <div class="card-columns">
             {{range .Tracks }}
-            <div class="card" style="width: 20vw;">
+            <div class="card"> 
                 <div class="card-header"> 
                     <h6>{{ .Count }}</h6>
                 </div>
                 <a href="{{ .URL }}">
-                    <img class="card-img-top" style="width: 100%; height: auto; object-fit: cover;" src="{{ .Image }}" alt="{{ .Name }}">
+                    <img class="card-img-top" style="object-fit: cover;" src="{{ .Image }}" alt="{{ .Name }}">
                 </a>
                 <div class="card-body"> 
                     <p class="card-text"><strong><a href="{{ .URL }}">{{ .Name }}</a></strong>

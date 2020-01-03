@@ -1,7 +1,9 @@
 README.md
 deploy.sh
 .gitignore
+
 bin/**
+CloudFunctions/**
 token.json
 *.bak
 *.bak.go
