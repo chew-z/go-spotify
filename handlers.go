@@ -113,8 +113,14 @@ func user(c *gin.Context) {
 		if err != nil {
 			log.Panic(err)
 		}
-		msg := fmt.Sprintf("You are logged in as: %s", user.DisplayName)
-		c.String(http.StatusOK, msg)
+		c.HTML(
+			http.StatusOK,
+			"user.html",
+			gin.H{
+				"User": user.DisplayName,
+			},
+		)
+
 	}()
 }
 

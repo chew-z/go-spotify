@@ -26,27 +26,28 @@ func init() {
 	router.LoadHTMLGlob("templates/*")
 
 	router.GET("/", func(c *gin.Context) {
-		c.String(http.StatusOK, "Hello World! This is go-spotify here.")
+		c.HTML(http.StatusOK, "main.html", gin.H{})
 	})
+	// internal pages
 	router.GET("/callback", callback)
-
-	router.GET("/user", user)
-	router.GET("/top", top)
 	router.GET("/recent", recent)
-	router.GET("/history", history)
+	// HTML pages
+	router.GET("/top", top)
 	router.GET("/popular", popular)
-	// router.GET("/midnight", midnight)
+	router.GET("/history", history)
+	router.GET("/mood", moodFromHistory)
+	router.GET("/user", user)
+	// TXT pages TODO
 	router.GET("/tracks", tracks)
 	router.GET("/playlists", playlists)
 	router.GET("/albums", albums)
 	router.GET("/artists", artists)
-
 	router.GET("/search", search)
-	router.GET("/oldmood", mood)
-	router.GET("/mood", moodFromHistory)
 	router.GET("/recommend", recommend)
 	router.GET("/spot", spot)
 	router.GET("/analyze", analyze)
+	// DISABLED
+	// router.GET("/midnight", midnight)
 
 	router.Run()
 }
