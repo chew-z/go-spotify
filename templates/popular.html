@@ -12,7 +12,7 @@
     {{range .Tracks }}
     <div class="card">
         <div class="card-body">
-            <p class="card-text">[{{.PlayedAt.Format "15:04:05"}}] 
+            <p class="card-text">[{{.Count}}] 
             {{with .Name}}<strong>{{.}}</strong>{{end}} 
             <em>{{.Artists}}</em></p>
         </div>

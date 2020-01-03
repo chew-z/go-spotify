@@ -146,17 +146,27 @@ func top(c *gin.Context) {
 			log.Panic(err)
 			c.String(http.StatusNotFound, err.Error())
 		}
-		var b strings.Builder
-		b.WriteString("Top :")
-		for _, item := range top.Tracks {
-			b.WriteString("\n- ")
-			b.WriteString(item.Name)
-			b.WriteString(" [ ")
-			b.WriteString(item.Album.Name)
-			b.WriteString(" ] --  ")
-			b.WriteString(joinArtists(item.Artists, ", "))
+		type topTrack struct {
+			Name    string
+			Album   string
+			Artists string
 		}
-		c.String(http.StatusOK, b.String())
+		var tt topTrack
+		var tracks []topTrack
+		for _, item := range top.Tracks {
+			tt.Name = item.Name
+			tt.Album = item.Album.Name
+			tt.Artists = joinArtists(item.Artists, ", ")
+			tracks = append(tracks, tt)
+		}
+		c.HTML(
+			http.StatusOK,
+			"top.html",
+			gin.H{
+				"Tracks": tracks,
+				"title":  "Top tracks",
+			},
+		)
 	}()
 }
 
@@ -237,9 +247,6 @@ func history(c *gin.Context) {
 	ctx := context.Background()
 	firestoreClient := initFirestoreDatabase(ctx)
 	defer firestoreClient.Close()
-	var b strings.Builder
-	b.WriteString("Recently Played :\n")
-	// iter := firestoreClient.Collection("recently_played").Documents(ctx)
 	iter := firestoreClient.Collection("recently_played").OrderBy("played_at", firestore.Desc).Limit(100).Documents(ctx)
 	var tr firestoreTrack
 	var tracks []firestoreTrack
@@ -248,15 +255,14 @@ func history(c *gin.Context) {
 		if err == iterator.Done {
 			break
 		}
-		// log.Println(doc.Ref.ID) get TrackIDs, must be after iterator.Done otherwise we hit nil pointer
 		if err != nil {
 			log.Println(err.Error())
 		}
 		if err := doc.DataTo(&tr); err != nil {
 			log.Println(err.Error())
 		} else {
+			tr.PlayedAt = tr.PlayedAt.In(location) // move time to location
 			tracks = append(tracks, tr)
-			// b.WriteString(fmt.Sprintf("[ %s ] %s -- %s\n", tr.PlayedAt.In(location).Format("15:04:05"), tr.Name, tr.Artists))
 		}
 	}
 	// Call the HTML method of the Context to render a template
@@ -271,8 +277,6 @@ func history(c *gin.Context) {
 			"title":  "Recently Played",
 		},
 	)
-	// c.String(http.StatusOK, b.String())
-
 }
 
 /* popular - read counter of how many tracks has been played from Firestore
@@ -308,7 +312,13 @@ func popular(c *gin.Context) {
 		b.WriteString("Popular Tracks:\n")
 		pops := firestoreClient.Collection("popular_tracks").OrderBy("count", firestore.Desc).Limit(50).Documents(ctx)
 		var pt popularTrack
-		toplist := []int{}
+		type toptrack struct {
+			Count   int
+			Name    string
+			Artists string
+		}
+		var tracks []toptrack
+		var toplist []int
 		trackIDs := []spotify.ID{}
 		for {
 			doc, err := pops.Next()
@@ -329,10 +339,27 @@ func popular(c *gin.Context) {
 		if err != nil {
 			log.Println(err.Error())
 		}
+		var tt toptrack
 		for i := range toplist {
-			b.WriteString(fmt.Sprintf("[ %d ] %s -- %s\n", toplist[i], topTracks[i].Name, joinArtists(topTracks[i].Artists, ", ")))
+			tt.Count = toplist[i]
+			tt.Name = topTracks[i].Name
+			tt.Artists = joinArtists(topTracks[i].Artists, ", ")
+			tracks = append(tracks, tt)
+			// b.WriteString(fmt.Sprintf("[ %d ] %s -- %s\n", toplist[i], topTracks[i].Name, joinArtists(topTracks[i].Artists, ", ")))
 		}
-		c.String(http.StatusOK, b.String())
+		// Call the HTML method of the Context to render a template
+		c.HTML(
+			// Set the HTTP status to 200 (OK)
+			http.StatusOK,
+			// Use the index.html template
+			"popular.html",
+			// Pass the data that the page uses (in this case, 'title')
+			gin.H{
+				"Tracks": tracks,
+				"title":  "Popular tracks",
+			},
+		)
+		// c.String(http.StatusOK, b.String())
 	}()
 }
 
