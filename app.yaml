@@ -31,6 +31,7 @@ resources:
 handlers:
   - url: /.*
     script: auto
+    secure: always
 
 
 includes:

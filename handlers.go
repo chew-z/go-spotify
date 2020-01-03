@@ -28,6 +28,14 @@ type firestoreTrack struct {
 type popularTrack struct {
 	Count int `firestore:"count,omitempty"`
 }
+type topTrack struct {
+	Count   int
+	Name    string
+	Artists string
+	URL     string
+	Album   string
+	Image   string
+}
 
 const (
 	maxLists              = 5
@@ -120,7 +128,6 @@ func user(c *gin.Context) {
 				"User": user.DisplayName,
 			},
 		)
-
 	}()
 }
 
@@ -152,13 +159,6 @@ func top(c *gin.Context) {
 		if err != nil {
 			log.Panic(err)
 			c.String(http.StatusNotFound, err.Error())
-		}
-		type topTrack struct {
-			Name    string
-			Album   string
-			Artists string
-			URL     string
-			Image   string
 		}
 		var tt topTrack
 		var tracks []topTrack
@@ -210,45 +210,28 @@ func recent(c *gin.Context) {
 			log.Panic(err)
 			c.String(http.StatusNotFound, err.Error())
 		}
-
 		ctx := context.Background()
 		firestoreClient := initFirestoreDatabase(ctx)
 		// Get a new write batch.
 		batch := firestoreClient.Batch()
 		defer firestoreClient.Close()
-
-		var b strings.Builder
-		b.WriteString("Recently Played :")
 		for _, item := range recentlyPlayed {
 			artists := joinArtists(item.Track.Artists, ", ")
-			// playedAt := item.PlayedAt.In(loc).Format("15:04:05")
 			playedAt := item.PlayedAt
-
-			b.WriteString("\n- ")
-			b.WriteString(" [ ")
-			b.WriteString(playedAt.In(location).Format("15:04:05"))
-			b.WriteString(" ] ")
-			b.WriteString(item.Track.Name)
-			b.WriteString(" --  ")
-			b.WriteString(artists)
-
 			recentlyPlayedRef := firestoreClient.Collection("recently_played").Doc(string(item.Track.ID))
 			batch.Set(recentlyPlayedRef, map[string]interface{}{
 				"played_at":  playedAt,
 				"track_name": item.Track.Name,
 				"artists":    artists,
-				// "count":      firestore.Increment(1), // TODO - repeated /recent call increases count messing results
-				// if we stop playing and keep updating with /recent we create a winner ..
-				// but each other solution is transactional
 			}, firestore.MergeAll) // Overwrite only the fields in the map; preserve all others.
 		}
 		// Commit the batch.
 		_, errBatch := batch.Commit(ctx)
 		if errBatch != nil {
 			// Handle any errors in an appropriate way, such as returning them.
-			log.Printf("An error while commiting batch to firestore: %s", err)
+			log.Panic("An error while commiting batch to firestore: %s", err.Error())
 		}
-		c.String(http.StatusOK, b.String())
+		c.String(http.StatusOK, "OK")
 	}()
 }
 
@@ -276,13 +259,9 @@ func history(c *gin.Context) {
 			tracks = append(tracks, tr)
 		}
 	}
-	// Call the HTML method of the Context to render a template
 	c.HTML(
-		// Set the HTTP status to 200 (OK)
 		http.StatusOK,
-		// Use the index.html template
 		"history.html",
-		// Pass the data that the page uses (in this case, 'title')
 		gin.H{
 			"Tracks": tracks,
 			"title":  "Recently Played",
@@ -319,18 +298,8 @@ func popular(c *gin.Context) {
 		ctx := context.Background()
 		firestoreClient := initFirestoreDatabase(ctx)
 		defer firestoreClient.Close()
-		var b strings.Builder
-		b.WriteString("Popular Tracks:\n")
 		pops := firestoreClient.Collection("popular_tracks").OrderBy("count", firestore.Desc).Limit(pageLimit).Documents(ctx)
 		var pt popularTrack
-		type toptrack struct {
-			Count   int
-			Name    string
-			Artists string
-			URL     string
-			Image   string
-		}
-		var tracks []toptrack
 		var toplist []int
 		trackIDs := []spotify.ID{}
 		for {
@@ -342,17 +311,18 @@ func popular(c *gin.Context) {
 				log.Println(err.Error())
 			}
 			trackID := spotify.ID(doc.Ref.ID)
+			trackIDs = append(trackIDs, trackID)
 			if err := doc.DataTo(&pt); err != nil {
 				log.Println(err.Error())
 			}
 			toplist = append(toplist, pt.Count)
-			trackIDs = append(trackIDs, trackID)
 		}
 		topTracks, err := fullTrackGetMany(client, trackIDs)
 		if err != nil {
 			log.Println(err.Error())
 		}
-		var tt toptrack
+		var tt topTrack
+		var tracks []topTrack
 		for i := range toplist {
 			tt.Count = toplist[i]
 			tt.Name = topTracks[i].Name
@@ -386,9 +356,7 @@ func midnight(c *gin.Context) {
 		// Get a batch of documents
 		iter := ref.Limit(batchSize).Documents(ctx)
 		numDeleted := 0
-
-		// Iterate through the documents, adding
-		// a delete operation for each one to a
+		// Iterate through the documents, adding a delete operation for each one to a
 		// WriteBatch.
 		batch := firestoreClient.Batch()
 		for {
@@ -399,25 +367,19 @@ func midnight(c *gin.Context) {
 			if err != nil {
 				log.Println(err.Error())
 			}
-
 			batch.Delete(doc.Ref)
 			numDeleted++
 		}
-
-		// If there are no documents to delete,
-		// the process is over.
+		// If there are no documents to delete, the process is over.
 		if numDeleted == 0 {
 			break
 		}
-
 		_, err := batch.Commit(ctx)
 		if err != nil {
 			log.Println(err.Error())
 		}
 	}
-
 	c.String(http.StatusOK, "Midnight Run - starring Robert DeNiro")
-
 }
 
 /* tracks - display some of user's tracks
@@ -855,13 +817,6 @@ func moodFromHistory(c *gin.Context) {
 				log.Println(err.Error())
 			}
 		}
-		type topTrack struct {
-			Name    string
-			Album   string
-			Artists string
-			URL     string
-			Image   string
-		}
 		var tt topTrack
 		var tracks []topTrack
 		for _, item := range spotTracks {
@@ -934,13 +889,6 @@ func mood(c *gin.Context) {
 			} else {
 				log.Println(err.Error())
 			}
-		}
-		type topTrack struct {
-			Name    string
-			Album   string
-			Artists string
-			URL     string
-			Image   string
 		}
 		var tt topTrack
 		var tracks []topTrack
