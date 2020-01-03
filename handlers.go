@@ -97,24 +97,11 @@ func callback(c *gin.Context) {
 /* user - displays user identity (display name)
  */
 func user(c *gin.Context) {
-	endpoint := c.Request.URL.Path
-	client := getClient(endpoint)
-	deuceCookie, _ := c.Cookie("deuce")
-	log.Printf("Deuce: %s ", deuceCookie)
-
-	if client == nil { // get client from oauth
-		if deuceCookie == "1" { // wait for auth to complete
-			client = <-clientChannel
-			log.Printf("%s: Login Completed!", endpoint)
-		} else { // redirect to auth URL and exit
-			url := auth.AuthURL(endpoint)
-			log.Printf("%s: redirecting to %s", endpoint, url)
-			// HTTP standard does not pass through HTTP headers on an 302/301 directive
-			// 303 is never cached and always is GET
-			c.Redirect(303, url)
-			return
-		}
+	client := clientMagic(c)
+	if client == nil {
+		return
 	}
+
 	defer func() {
 		// use the client to make calls that require authorization
 		user, err := client.CurrentUser()
@@ -135,24 +122,11 @@ func user(c *gin.Context) {
 read zmb3/spotify code to learn more
 */
 func top(c *gin.Context) {
-	endpoint := c.Request.URL.Path
-	client := getClient(endpoint)
-	deuceCookie, _ := c.Cookie("deuce")
-	log.Printf("Deuce: %s ", deuceCookie)
-
-	if client == nil { // get client from oauth
-		if deuceCookie == "1" { // wait for auth to complete
-			client = <-clientChannel
-			log.Printf("%s: Login Completed!", endpoint)
-		} else { // redirect to auth URL and exit
-			url := auth.AuthURL(endpoint)
-			log.Printf("%s: redirecting to %s", endpoint, url)
-			// HTTP standard does not pass through HTTP headers on an 302/301 directive
-			// 303 is never cached and always is GET
-			c.Redirect(303, url)
-			return
-		}
+	client := clientMagic(c)
+	if client == nil {
+		return
 	}
+
 	defer func() {
 		// use the client to make calls that require authorization
 		top, err := client.CurrentUsersTopTracks()
@@ -185,24 +159,11 @@ func top(c *gin.Context) {
 and save(update) recently played tracks to Cloud Firestore database
 */
 func recent(c *gin.Context) {
-	endpoint := c.Request.URL.Path
-	client := getClient(endpoint)
-	deuceCookie, _ := c.Cookie("deuce")
-	log.Printf("Deuce: %s ", deuceCookie)
-
-	if client == nil { // get client from oauth
-		if deuceCookie == "1" { // wait for auth to complete
-			client = <-clientChannel
-			log.Printf("%s: Login Completed!", endpoint)
-		} else { // redirect to auth URL and exit
-			url := auth.AuthURL(endpoint)
-			log.Printf("%s: redirecting to %s", endpoint, url)
-			// HTTP standard does not pass through HTTP headers on an 302/301 directive
-			// 303 is never cached and always is GET
-			c.Redirect(303, url)
-			return
-		}
+	client := clientMagic(c)
+	if client == nil {
+		return
 	}
+
 	defer func() {
 		// use the client to make calls that require authorization
 		recentlyPlayed, err := client.PlayerRecentlyPlayed()
@@ -277,23 +238,11 @@ I see three different ways of doing it:
 3) with single loop and multiple calls to Spotify API - GetTrack(id ID)
 */
 func popular(c *gin.Context) {
-	endpoint := c.Request.URL.Path
-	client := getClient(endpoint)
-	deuceCookie, _ := c.Cookie("deuce")
-	log.Printf("Deuce: %s ", deuceCookie)
-	if client == nil { // get client from oauth
-		if deuceCookie == "1" { // wait for auth to complete
-			client = <-clientChannel
-			log.Printf("%s: Login Completed!", endpoint)
-		} else { // redirect to auth URL and exit
-			url := auth.AuthURL(endpoint)
-			log.Printf("%s: redirecting to %s", endpoint, url)
-			// HTTP standard does not pass through HTTP headers on an 302/301 directive
-			// 303 is never cached and always is GET
-			c.Redirect(303, url)
-			return
-		}
+	client := clientMagic(c)
+	if client == nil {
+		return
 	}
+
 	defer func() {
 		ctx := context.Background()
 		firestoreClient := initFirestoreDatabase(ctx)
@@ -385,24 +334,11 @@ func midnight(c *gin.Context) {
 /* tracks - display some of user's tracks
  */
 func tracks(c *gin.Context) {
-	endpoint := c.Request.URL.Path
-	client := getClient(endpoint)
-	deuceCookie, _ := c.Cookie("deuce")
-	log.Printf("Deuce: %s ", deuceCookie)
-
-	if client == nil { // get client from oauth
-		if deuceCookie == "1" { // wait for auth to complete
-			client = <-clientChannel
-			log.Printf("%s: Login Completed!", endpoint)
-		} else { // redirect to auth URL and exit
-			url := auth.AuthURL(endpoint)
-			log.Printf("%s: redirecting to %s", endpoint, url)
-			// HTTP standard does not pass through HTTP headers on an 302/301 directive
-			// 303 is never cached and always is GET
-			c.Redirect(303, url)
-			return
-		}
+	client := clientMagic(c)
+	if client == nil {
+		return
 	}
+
 	defer func() {
 		// use the client to make calls that require authorization
 		tracks, err := client.CurrentUsersTracks()
@@ -427,24 +363,11 @@ func tracks(c *gin.Context) {
 /* playlists - display some of user's playlists
  */
 func playlists(c *gin.Context) {
-	endpoint := c.Request.URL.Path
-	client := getClient(endpoint)
-	deuceCookie, _ := c.Cookie("deuce")
-	log.Printf("Deuce: %s ", deuceCookie)
-
-	if client == nil { // get client from oauth
-		if deuceCookie == "1" { // wait for auth to complete
-			client = <-clientChannel
-			log.Printf("%s: Login Completed!", endpoint)
-		} else { // redirect to auth URL and exit
-			url := auth.AuthURL(endpoint)
-			log.Printf("%s: redirecting to %s", endpoint, url)
-			// HTTP standard does not pass through HTTP headers on an 302/301 directive
-			// 303 is never cached and always is GET
-			c.Redirect(303, url)
-			return
-		}
+	client := clientMagic(c)
+	if client == nil {
+		return
 	}
+
 	defer func() {
 		// use the client to make calls that require authorization
 		playlists, err := client.CurrentUsersPlaylists()
@@ -465,24 +388,11 @@ func playlists(c *gin.Context) {
 /* albums - display some of user's albums
  */
 func albums(c *gin.Context) {
-	endpoint := c.Request.URL.Path
-	client := getClient(endpoint)
-	deuceCookie, _ := c.Cookie("deuce")
-	log.Printf("Deuce: %s ", deuceCookie)
-
-	if client == nil { // get client from oauth
-		if deuceCookie == "1" { // wait for auth to complete
-			client = <-clientChannel
-			log.Printf("%s: Login Completed!", endpoint)
-		} else { // redirect to auth URL and exit
-			url := auth.AuthURL(endpoint)
-			log.Printf("%s: redirecting to %s", endpoint, url)
-			// HTTP standard does not pass through HTTP headers on an 302/301 directive
-			// 303 is never cached and always is GET
-			c.Redirect(303, url)
-			return
-		}
+	client := clientMagic(c)
+	if client == nil {
+		return
 	}
+
 	defer func() {
 		// use the client to make calls that require authorization
 		albums, err := client.CurrentUsersAlbums()
@@ -505,24 +415,11 @@ func albums(c *gin.Context) {
 /* artists - displays user followed artists
  */
 func artists(c *gin.Context) {
-	endpoint := c.Request.URL.Path
-	client := getClient(endpoint)
-	deuceCookie, _ := c.Cookie("deuce")
-	log.Printf("Deuce: %s ", deuceCookie)
-
-	if client == nil { // get client from oauth
-		if deuceCookie == "1" { // wait for auth to complete
-			client = <-clientChannel
-			log.Printf("%s: Login Completed!", endpoint)
-		} else { // redirect to auth URL and exit
-			url := auth.AuthURL(endpoint)
-			log.Printf("%s: redirecting to %s", endpoint, url)
-			// HTTP standard does not pass through HTTP headers on an 302/301 directive
-			// 303 is never cached and always is GET
-			c.Redirect(303, url)
-			return
-		}
+	client := clientMagic(c)
+	if client == nil {
+		return
 	}
+
 	defer func() {
 		// use the client to make calls that require authorization
 		artists, err := client.CurrentUsersFollowedArtists()
@@ -543,12 +440,9 @@ func artists(c *gin.Context) {
 /* search - searches for playlists, albums, tracks etc.
  */
 func search(c *gin.Context) {
-	deuceCookie, _ := c.Cookie("deuce")
-	endpoint := c.Request.URL.Path
-	client := getClient(endpoint)
-	log.Printf("Deuce: %s ", deuceCookie)
 	qCookie, cookieErr := c.Cookie("search_query")
 	cCookie, _ := c.Cookie("search_category")
+	endpoint := c.Request.URL.Path
 	if cookieErr != nil {
 		qCookie = "NotSet"
 		cCookie = "NotSet"
@@ -556,20 +450,11 @@ func search(c *gin.Context) {
 		c.SetCookie("search_category", c.Query("c"), cookieLifetime, endpoint, "", false, true)
 	}
 	log.Printf("Cookie values: %s %s \n", qCookie, cCookie)
-
-	if client == nil { // get client from oauth
-		if deuceCookie == "1" { // wait for auth to complete
-			client = <-clientChannel
-			log.Printf("%s: Login Completed!", endpoint)
-		} else { // redirect to auth URL and exit
-			url := auth.AuthURL(endpoint)
-			log.Printf("%s: redirecting to %s", endpoint, url)
-			// HTTP standard does not pass through HTTP headers on an 302/301 directive
-			// 303 is never cached and always is GET
-			c.Redirect(303, url)
-			return
-		}
+	client := clientMagic(c)
+	if client == nil {
+		return
 	}
+
 	defer func() {
 		query := c.DefaultQuery("q", qCookie)
 		searchCategory := c.DefaultQuery("c", cCookie)
@@ -589,10 +474,7 @@ func search(c *gin.Context) {
 analysis of results
 */
 func analyze(c *gin.Context) {
-	deuceCookie, _ := c.Cookie("deuce")
 	endpoint := c.Request.URL.Path
-	client := getClient(endpoint)
-	log.Printf("Deuce: %s ", deuceCookie)
 	qCookie, cookieErr := c.Cookie("search_query")
 	cCookie, _ := c.Cookie("search_category")
 	if cookieErr != nil {
@@ -602,20 +484,11 @@ func analyze(c *gin.Context) {
 		c.SetCookie("search_category", c.Query("c"), cookieLifetime, endpoint, "", false, true)
 	}
 	log.Printf("Cookie values: %s %s \n", qCookie, cCookie)
-
-	if client == nil { // get client from oauth
-		if deuceCookie == "1" { // wait for auth to complete
-			client = <-clientChannel
-			log.Printf("%s: Login Completed!", endpoint)
-		} else { // redirect to auth URL and exit
-			url := auth.AuthURL(endpoint)
-			log.Printf("%s: redirecting to %s", endpoint, url)
-			// HTTP standard does not pass through HTTP headers on an 302/301 directive
-			// 303 is never cached and always is GET
-			c.Redirect(303, url)
-			return
-		}
+	client := clientMagic(c)
+	if client == nil {
+		return
 	}
+
 	defer func() {
 		query := c.DefaultQuery("q", qCookie)
 		searchCategory := c.DefaultQuery("c", cCookie)
@@ -636,29 +509,17 @@ accepts query parameters t1..t5 with trackIDs.
 prints recommended tracks
 */
 func recommend(c *gin.Context) {
-	deuceCookie, _ := c.Cookie("deuce")
 	endpoint := c.Request.URL.Path
-	client := getClient(endpoint)
-	log.Printf("Deuce: %s ", deuceCookie)
 	for i := 1; i < 6; i++ {
 		cookieName := fmt.Sprintf("t%d", i)
 		c.SetCookie(cookieName, c.Query(cookieName), 45, endpoint, "", false, true)
 		log.Printf("Cookie %s value: %s \n", cookieName, c.Query(cookieName))
 	}
-
-	if client == nil { // get client from oauth
-		if deuceCookie == "1" { // wait for auth to complete
-			client = <-clientChannel
-			log.Printf("%s: Login Completed!", endpoint)
-		} else { // redirect to auth URL and exit
-			url := auth.AuthURL(endpoint)
-			log.Printf("%s: redirecting to %s", endpoint, url)
-			// HTTP standard does not pass through HTTP headers on an 302/301 directive
-			// 303 is never cached and always is GET
-			c.Redirect(303, url)
-			return
-		}
+	client := clientMagic(c)
+	if client == nil {
+		return
 	}
+
 	defer func() {
 		trackIDs := []spotify.ID{}
 		for i := 1; i < 6; i++ {
@@ -709,10 +570,7 @@ or any other (based on passed parameters)
 r=1 - replace, p=[ID]
 */
 func spot(c *gin.Context) {
-	deuceCookie, _ := c.Cookie("deuce")
 	endpoint := c.Request.URL.Path
-	client := getClient(endpoint)
-	log.Printf("Deuce: %s ", deuceCookie)
 	replaceCookie, cookieErr := c.Cookie("replace_playlist")
 	playlistCookie, _ := c.Cookie("playlist_ID")
 	if cookieErr != nil {
@@ -720,20 +578,11 @@ func spot(c *gin.Context) {
 		c.SetCookie("playlist_ID", c.DefaultQuery("p", defaultMoodPlaylistID), cookieLifetime, endpoint, "", false, true)
 	}
 	log.Printf("Cookie values: %s %s \n", replaceCookie, playlistCookie)
-
-	if client == nil { // get client from oauth
-		if deuceCookie == "1" { // wait for auth to complete
-			client = <-clientChannel
-			log.Printf("%s: Login Completed!", endpoint)
-		} else { // redirect to auth URL and exit
-			url := auth.AuthURL(endpoint)
-			log.Printf("%s: redirecting to %s", endpoint, url)
-			// HTTP standard does not pass through HTTP headers on an 302/301 directive
-			// 303 is never cached and always is GET
-			c.Redirect(303, url)
-			return
-		}
+	client := clientMagic(c)
+	if client == nil {
+		return
 	}
+
 	defer func() {
 		spotTracks, err := recommendFromTop(client)
 		if err != nil {
@@ -773,10 +622,7 @@ or any other (based on passed parameters)
 r=1 - replace, p=[ID]
 */
 func moodFromHistory(c *gin.Context) {
-	deuceCookie, _ := c.Cookie("deuce")
 	endpoint := c.Request.URL.Path
-	client := getClient(endpoint)
-	log.Printf("Deuce: %s ", deuceCookie)
 	replaceCookie, cookieErr := c.Cookie("replace_playlist")
 	playlistCookie, _ := c.Cookie("playlist_ID")
 	if cookieErr != nil {
@@ -784,20 +630,11 @@ func moodFromHistory(c *gin.Context) {
 		c.SetCookie("playlist_ID", c.DefaultQuery("p", defaultMoodPlaylistID), cookieLifetime, endpoint, "", false, true)
 	}
 	log.Printf("Cookie values: %s %s \n", replaceCookie, playlistCookie)
-
-	if client == nil { // get client from oauth
-		if deuceCookie == "1" { // wait for auth to complete
-			client = <-clientChannel
-			log.Printf("%s: Login Completed!", endpoint)
-		} else { // redirect to auth URL and exit
-			url := auth.AuthURL(endpoint)
-			log.Printf("%s: redirecting to %s", endpoint, url)
-			// HTTP standard does not pass through HTTP headers on an 302/301 directive
-			// 303 is never cached and always is GET
-			c.Redirect(303, url)
-			return
-		}
+	client := clientMagic(c)
+	if client == nil {
+		return
 	}
+
 	defer func() {
 		spotTracks, err := recommendFromHistory(client)
 		if err != nil {
@@ -846,10 +683,7 @@ r=1 - replace, p=[ID]
 NOT USED - we are using moodFromHistory as handler
 */
 func mood(c *gin.Context) {
-	deuceCookie, _ := c.Cookie("deuce")
 	endpoint := c.Request.URL.Path
-	client := getClient(endpoint)
-	log.Printf("Deuce: %s ", deuceCookie)
 	replaceCookie, cookieErr := c.Cookie("replace_playlist")
 	playlistCookie, _ := c.Cookie("playlist_ID")
 	if cookieErr != nil {
@@ -857,20 +691,11 @@ func mood(c *gin.Context) {
 		c.SetCookie("playlist_ID", c.DefaultQuery("p", defaultMoodPlaylistID), cookieLifetime, endpoint, "", false, true)
 	}
 	log.Printf("Cookie values: %s %s \n", replaceCookie, playlistCookie)
-
-	if client == nil { // get client from oauth
-		if deuceCookie == "1" { // wait for auth to complete
-			client = <-clientChannel
-			log.Printf("%s: Login Completed!", endpoint)
-		} else { // redirect to auth URL and exit
-			url := auth.AuthURL(endpoint)
-			log.Printf("%s: redirecting to %s", endpoint, url)
-			// HTTP standard does not pass through HTTP headers on an 302/301 directive
-			// 303 is never cached and always is GET
-			c.Redirect(303, url)
-			return
-		}
+	client := clientMagic(c)
+	if client == nil {
+		return
 	}
+
 	defer func() {
 		spotTracks, err := recommendFromMood(client)
 		if err != nil {

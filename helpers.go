@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"cloud.google.com/go/firestore"
+	"github.com/gin-gonic/gin"
 	"github.com/zmb3/spotify"
 	"golang.org/x/oauth2"
 	"google.golang.org/api/iterator"
@@ -33,6 +34,28 @@ type recommendationParameters struct {
 	TrackAttributes *spotify.TrackAttributes
 	FromYear        int
 	MinTrackCount   int
+}
+
+func clientMagic(c *gin.Context) *spotify.Client {
+	endpoint := c.Request.URL.Path
+	client := getClient(endpoint)
+	deuceCookie, _ := c.Cookie("deuce")
+	log.Printf("Deuce: %s ", deuceCookie)
+
+	if client == nil { // get client from oauth
+		if deuceCookie == "1" { // wait for auth to complete
+			client = <-clientChannel
+			log.Printf("%s: Login Completed!", endpoint)
+		} else { // redirect to auth URL and exit
+			url := auth.AuthURL(endpoint)
+			log.Printf("%s: redirecting to %s", endpoint, url)
+			// HTTP standard does not pass through HTTP headers on an 302/301 directive
+			// 303 is never cached and always is GET
+			c.Redirect(303, url)
+			return nil
+		}
+	}
+	return client
 }
 
 /* getClient - restore client for given endpoint/state from cache
