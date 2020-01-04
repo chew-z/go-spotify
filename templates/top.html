@@ -1,31 +1,22 @@
-<!--index.html-->
+<!--top.html-->
 
 <!--Embed the header.html template at this location-->
 {{ template "header.html" .}}
-<!-- <p> -->
-<!--   {{with .Email}}You are currently logged in as {{.}}.{{end}} -->
-<!--   {{with .Login}}<a href="{{.}}">Sign in</a>{{end}} -->
-<!--   {{with .Logout}}<a href="{{.}}">Sign out</a>{{end}} -->
-<!-- </p> -->
 <h4 class="display-4">{{ .title }}</h4>
 <div class="container">
     <div class="card-columns">
         {{range .Tracks }}
-        <div class="card">
-            <div class="card-header"> <strong><a href="{{ .URL }}">{{ .Name }}</a></strong>
-
-            </div>
-            <div class="card-body">
-                <a href="{{ .URL }}">
-                    <img class="card-img-top" style="object-fit: cover;" src="{{ .Image }}" alt="{{ .Name }}">
-                </a>
-                <div class="card-body"> 
-                    <p class="card-text">[{{.Album}}] <em>{{.Artists}}</em></p>
-                </div>
-
-
-            </div>
-        </div>
+            {{ template "item.html" .}}
+        <!-- <div class="card"> -->
+        <!--     <a href="{{ .URL }}"> -->
+        <!--         <img class="card-img-top" style="object-fit: cover;" src="{{ .Image }}" alt="{{ .Name }}"> -->
+        <!--     </a> -->
+        <!--     <div class="card-body"> -->
+        <!--         <h5 class="card-title"><a href="{{ .URL }}">{{.Name}}</a></h5> -->
+        <!--         <p class="card-text">{{.Album}}</p> -->
+        <!--         <p class="card-text"><em>{{.Artists}}</em></p> -->
+        <!--     </div> -->
+        <!-- </div> -->
         {{end}}
     </div>
 </div>

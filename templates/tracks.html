@@ -1,4 +1,4 @@
-<!--index.html-->
+<!--tracks.html-->
 
 <!--Embed the header.html template at this location-->
 {{ template "header.html" .}}
@@ -11,21 +11,7 @@
 <div class="container">
     <div class="card-columns">
         {{range .Tracks }}
-        <div class="card">
-            <div class="card-header"> <strong><a href="{{ .URL }}">{{ .Name }}</a></strong>
-
-            </div>
-            <div class="card-body">
-                <a href="{{ .URL }}">
-                    <img class="card-img-top" style="object-fit: cover;" src="{{ .Image }}" alt="{{ .Name }}">
-                </a>
-                <div class="card-body"> 
-                    <p class="card-text">[{{.Album}}] <em>{{.Artists}}</em></p>
-                </div>
-
-
-            </div>
-        </div>
+            {{ template "item.html" .}}
         {{end}}
     </div>
 </div>

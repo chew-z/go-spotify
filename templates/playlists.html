@@ -12,18 +12,13 @@
     <div class="card-columns">
         {{range .Playlists }}
         <div class="card">
-            <div class="card-header"> <strong><a href="{{ .URL }}">{{ .Name }}</a></strong>
-
-            </div>
-            <div class="card-body">
-                <a href="{{ .URL }}">
-                    <img class="card-img-top" style="object-fit: cover;" src="{{ .Image }}" alt="{{ .Name }}">
-                </a>
-                <div class="card-body"> 
-                    <p class="card-text">[{{.Owner}}] <em>{{.Tracks}}</em></p>
-                </div>
-
-
+            <!-- <div class="card-header"> <strong><a href="{{ .URL }}">{{ .Name }}</a></strong> -->
+            <!-- </div> -->
+            <a href="{{ .URL }}">
+                <img class="card-img-top" style="object-fit: scale-down;" src="{{ .Image }}" alt="{{ .Name }}">
+            </a>
+            <div class="card-body"> 
+                <p class="card-text">[{{.Owner}}] <em>{{.Tracks}}</em></p>
             </div>
         </div>
         {{end}}
