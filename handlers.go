@@ -592,9 +592,8 @@ func spot(c *gin.Context) {
 		}
 		var b strings.Builder
 		b.WriteString("Recommended tracks based on your top artists\n")
-		replace := c.DefaultQuery("r", replaceCookie)
-		playlist := c.DefaultQuery("p", playlistCookie)
-		if replace == "1" {
+		if replace := c.DefaultQuery("r", replaceCookie); replace == "1" {
+			playlist := c.DefaultQuery("p", playlistCookie)
 			recommendedPlaylistID := spotify.ID(playlist)
 			chunks := chunkIDs(getSpotifyIDs(spotTracks), pageLimit)
 			err = client.ReplacePlaylistTracks(recommendedPlaylistID, chunks[0]...)
@@ -642,9 +641,8 @@ func moodFromHistory(c *gin.Context) {
 			c.String(http.StatusNotFound, err.Error())
 			return
 		}
-		replace := c.DefaultQuery("r", replaceCookie)
-		playlist := c.DefaultQuery("p", playlistCookie)
-		if replace == "1" {
+		if replace := c.DefaultQuery("r", replaceCookie); replace == "1" {
+			playlist := c.DefaultQuery("p", playlistCookie)
 			recommendedPlaylistID := spotify.ID(playlist)
 			chunks := chunkIDs(getSpotifyIDs(spotTracks), pageLimit)
 			err = client.ReplacePlaylistTracks(recommendedPlaylistID, chunks[0]...)
