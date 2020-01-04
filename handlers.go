@@ -36,6 +36,16 @@ type topTrack struct {
 	Album   string
 	Image   string
 }
+type audioTrack struct {
+	ID               spotify.ID
+	Name             string
+	Energy           int
+	Loudness         int
+	Tempo            int
+	Instrumentalness int
+	Acousticness     int
+	URL              string
+}
 
 const (
 	maxLists              = 5
@@ -188,6 +198,54 @@ func popular(c *gin.Context) {
 			gin.H{
 				"Tracks": tracks,
 				"title":  "Popular tracks",
+			},
+		)
+	}()
+}
+func popularAnalysis(c *gin.Context) {
+	client := clientMagic(c)
+	if client == nil {
+		return
+	}
+	defer func() {
+		ctx := context.Background()
+		firestoreClient := initFirestoreDatabase(ctx)
+		defer firestoreClient.Close()
+		pops := firestoreClient.Collection("popular_tracks").OrderBy("count", firestore.Desc).Limit(pageLimit).Documents(ctx)
+		trackIDs := []spotify.ID{}
+		for {
+			doc, err := pops.Next()
+			if err == iterator.Done {
+				break
+			}
+			if err != nil {
+				log.Println(err.Error())
+			}
+			trackID := spotify.ID(doc.Ref.ID)
+			trackIDs = append(trackIDs, trackID)
+		}
+		data := miniAudioFeatures(trackIDs, client)
+		// topTracks, err := fullTrackGetMany(client, trackIDs)
+		// if err != nil {
+		// 	log.Println(err.Error())
+		// }
+		// var tt topTrack
+		// var tracks []topTrack
+		// for i := range toplist {
+		// 	tt.Count = toplist[i]
+		// 	tt.Name = topTracks[i].Name
+		// 	tt.Artists = joinArtists(topTracks[i].Artists, ", ")
+		// 	tt.URL = topTracks[i].ExternalURLs["spotify"]
+		// 	tt.Image = topTracks[i].Album.Images[1].URL
+		// 	tracks = append(tracks, tt)
+		// }
+		// Call the HTML method of the Context to render a template
+		c.HTML(
+			http.StatusOK,
+			"chart.html",
+			gin.H{
+				"Data":  *data,
+				"title": "Chart",
 			},
 		)
 	}()

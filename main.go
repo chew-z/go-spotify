@@ -27,6 +27,7 @@ func init() {
 	router.GET("/", func(c *gin.Context) {
 		c.HTML(http.StatusOK, "main.html", gin.H{})
 	})
+	router.GET("/chart", popularAnalysis)
 	// internal pages
 	router.GET("/callback", callback)
 	router.GET("/recent", recent)

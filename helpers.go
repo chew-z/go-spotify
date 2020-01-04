@@ -374,6 +374,26 @@ func handleSearchResults(results *spotify.SearchResult) string {
 	return b.String()
 }
 
+func miniAudioFeatures(ids []spotify.ID, client *spotify.Client) *[]audioTrack {
+	var f audioTrack
+	var audioTracks []audioTrack
+	chunks := chunkIDs(ids, pageLimit)
+	audioFeatures, _ := client.GetAudioFeatures(chunks[0]...) // GetAudioFeatures has variadic argument
+	fullTracks, _ := fullTrackGetMany(client, chunks[0])      // GetAudioFeatures has variadic argument
+	for i, res := range audioFeatures {
+		f.ID = res.ID
+		f.Name = fullTracks[i].Name
+		f.Energy = int(100.0 * res.Energy)
+		f.Loudness = int(-1.66 * res.Loudness)
+		f.Tempo = int(res.Tempo - 100.0)
+		f.Instrumentalness = int(100.0 * res.Instrumentalness)
+		f.Acousticness = int(100.0 * res.Acousticness)
+		f.URL = fullTracks[i].ExternalURLs["spotify"]
+		audioTracks = append(audioTracks, f)
+	}
+	return &audioTracks
+}
+
 /* handleSearchResults - pretty print search results with acoustic attributes
  */
 func handleAudioFeatures(results *spotify.SearchResult, client *spotify.Client) string {
