@@ -17,7 +17,7 @@ import (
 )
 
 /* TODO
--- gracefull handling of zmb3/spotify errors
+-- gracefull handling of returned errors
 like 403 lack of scope, unexpected endpoint etc.
 */
 type firestoreTrack struct {
@@ -94,30 +94,6 @@ func callback(c *gin.Context) {
 	log.Printf("/callback: redirecting to endpoint %s", url)
 }
 
-/* user - displays user identity (display name)
- */
-func user(c *gin.Context) {
-	client := clientMagic(c)
-	if client == nil {
-		return
-	}
-
-	defer func() {
-		// use the client to make calls that require authorization
-		user, err := client.CurrentUser()
-		if err != nil {
-			log.Panic(err)
-		}
-		c.HTML(
-			http.StatusOK,
-			"user.html",
-			gin.H{
-				"User": user.DisplayName,
-			},
-		)
-	}()
-}
-
 /* top - prints user's top tracks (sensible defaults)
 read zmb3/spotify code to learn more
 */
@@ -153,81 +129,6 @@ func top(c *gin.Context) {
 			},
 		)
 	}()
-}
-
-/* recent - display recently played tracks
-and save(update) recently played tracks to Cloud Firestore database
-*/
-func recent(c *gin.Context) {
-	client := clientMagic(c)
-	if client == nil {
-		return
-	}
-
-	defer func() {
-		// use the client to make calls that require authorization
-		recentlyPlayed, err := client.PlayerRecentlyPlayed()
-		if err != nil {
-			log.Panic(err)
-			c.String(http.StatusNotFound, err.Error())
-		}
-		ctx := context.Background()
-		firestoreClient := initFirestoreDatabase(ctx)
-		// Get a new write batch.
-		batch := firestoreClient.Batch()
-		defer firestoreClient.Close()
-		for _, item := range recentlyPlayed {
-			artists := joinArtists(item.Track.Artists, ", ")
-			playedAt := item.PlayedAt
-			recentlyPlayedRef := firestoreClient.Collection("recently_played").Doc(string(item.Track.ID))
-			batch.Set(recentlyPlayedRef, map[string]interface{}{
-				"played_at":  playedAt,
-				"track_name": item.Track.Name,
-				"artists":    artists,
-			}, firestore.MergeAll) // Overwrite only the fields in the map; preserve all others.
-		}
-		// Commit the batch.
-		_, errBatch := batch.Commit(ctx)
-		if errBatch != nil {
-			// Handle any errors in an appropriate way, such as returning them.
-			log.Panic("An error while commiting batch to firestore: %s", err.Error())
-		}
-		c.String(http.StatusOK, "OK")
-	}()
-}
-
-/* history - read saved tracks from Cloud Firestore database
- */
-func history(c *gin.Context) {
-	ctx := context.Background()
-	firestoreClient := initFirestoreDatabase(ctx)
-	defer firestoreClient.Close()
-	iter := firestoreClient.Collection("recently_played").OrderBy("played_at", firestore.Desc).Limit(pageLimit).Documents(ctx)
-	var tr firestoreTrack
-	var tracks []firestoreTrack
-	for {
-		doc, err := iter.Next()
-		if err == iterator.Done {
-			break
-		}
-		if err != nil {
-			log.Println(err.Error())
-		}
-		if err := doc.DataTo(&tr); err != nil {
-			log.Println(err.Error())
-		} else {
-			tr.PlayedAt = tr.PlayedAt.In(location) // move time to location
-			tracks = append(tracks, tr)
-		}
-	}
-	c.HTML(
-		http.StatusOK,
-		"history.html",
-		gin.H{
-			"Tracks": tracks,
-			"title":  "Recently Played",
-		},
-	)
 }
 
 /* popular - read counter of how many tracks has been played from Firestore
@@ -292,43 +193,121 @@ func popular(c *gin.Context) {
 	}()
 }
 
-/* midnight - endpoint to clean tracks history from Cloud Firestore database
-NOT USED - we keep tracks history for a time
-*/
-func midnight(c *gin.Context) {
+/* history - read saved tracks from Cloud Firestore database
+ */
+func history(c *gin.Context) {
 	ctx := context.Background()
 	firestoreClient := initFirestoreDatabase(ctx)
 	defer firestoreClient.Close()
-	batchSize := 20
-	ref := firestoreClient.Collection("recently_played")
+	iter := firestoreClient.Collection("recently_played").OrderBy("played_at", firestore.Desc).Limit(pageLimit).Documents(ctx)
+	var tr firestoreTrack
+	var tracks []firestoreTrack
 	for {
-		// Get a batch of documents
-		iter := ref.Limit(batchSize).Documents(ctx)
-		numDeleted := 0
-		// Iterate through the documents, adding a delete operation for each one to a
-		// WriteBatch.
-		batch := firestoreClient.Batch()
-		for {
-			doc, err := iter.Next()
-			if err == iterator.Done {
-				break
-			}
-			if err != nil {
-				log.Println(err.Error())
-			}
-			batch.Delete(doc.Ref)
-			numDeleted++
-		}
-		// If there are no documents to delete, the process is over.
-		if numDeleted == 0 {
+		doc, err := iter.Next()
+		if err == iterator.Done {
 			break
 		}
-		_, err := batch.Commit(ctx)
 		if err != nil {
 			log.Println(err.Error())
 		}
+		if err := doc.DataTo(&tr); err != nil {
+			log.Println(err.Error())
+		} else {
+			tr.PlayedAt = tr.PlayedAt.In(location) // move time to location
+			tracks = append(tracks, tr)
+		}
 	}
-	c.String(http.StatusOK, "Midnight Run - starring Robert DeNiro")
+	c.HTML(
+		http.StatusOK,
+		"history.html",
+		gin.H{
+			"Tracks": tracks,
+			"title":  "Recently Played",
+		},
+	)
+}
+
+/* moodFromHistory - recommends tracks based on current mood
+(recently played tracks) [Firestore version]
+recommeded tracks could replace default mood playlist
+or any other (based on passed parameters)
+r=1 - replace, p=[ID]
+*/
+func moodFromHistory(c *gin.Context) {
+	endpoint := c.Request.URL.Path
+	replaceCookie, cookieErr := c.Cookie("replace_playlist")
+	playlistCookie, _ := c.Cookie("playlist_ID")
+	if cookieErr != nil {
+		c.SetCookie("replace_playlist", c.Query("r"), cookieLifetime, endpoint, "", false, true)
+		c.SetCookie("playlist_ID", c.DefaultQuery("p", defaultMoodPlaylistID), cookieLifetime, endpoint, "", false, true)
+	}
+	log.Printf("Cookie values: %s %s \n", replaceCookie, playlistCookie)
+	client := clientMagic(c)
+	if client == nil {
+		return
+	}
+
+	defer func() {
+		spotTracks, err := recommendFromHistory(client)
+		if err != nil {
+			log.Println(err.Error())
+			c.String(http.StatusNotFound, err.Error())
+			return
+		}
+		if replace := c.DefaultQuery("r", replaceCookie); replace == "1" {
+			playlist := c.DefaultQuery("p", playlistCookie)
+			recommendedPlaylistID := spotify.ID(playlist)
+			chunks := chunkIDs(getSpotifyIDs(spotTracks), pageLimit)
+			err = client.ReplacePlaylistTracks(recommendedPlaylistID, chunks[0]...)
+			if err == nil {
+				log.Println("Tracks added")
+			} else {
+				log.Println(err.Error())
+			}
+		}
+		var tt topTrack
+		var tracks []topTrack
+		for _, item := range spotTracks {
+			tt.Name = item.Name
+			tt.Album = item.Album.Name
+			tt.Artists = joinArtists(item.Artists, ", ")
+			tt.URL = item.ExternalURLs["spotify"]
+			tt.Image = item.Album.Images[1].URL
+			tracks = append(tracks, tt)
+		}
+		c.HTML(
+			http.StatusOK,
+			"mood.html",
+			gin.H{
+				"Tracks": tracks,
+				"title":  "Mood",
+			},
+		)
+	}()
+}
+
+/* user - displays user identity (display name)
+ */
+func user(c *gin.Context) {
+	client := clientMagic(c)
+	if client == nil {
+		return
+	}
+
+	defer func() {
+		// use the client to make calls that require authorization
+		user, err := client.CurrentUser()
+		if err != nil {
+			log.Panic(err)
+		}
+		c.HTML(
+			http.StatusOK,
+			"user.html",
+			gin.H{
+				"User": user.DisplayName,
+			},
+		)
+	}()
 }
 
 /* tracks - display some of user's tracks
@@ -341,22 +320,30 @@ func tracks(c *gin.Context) {
 
 	defer func() {
 		// use the client to make calls that require authorization
-		tracks, err := client.CurrentUsersTracks()
+		userTracks, err := client.CurrentUsersTracks()
 		if err != nil {
 			log.Panic(err)
 			c.String(http.StatusNotFound, err.Error())
 		}
-		var b strings.Builder
-		b.WriteString("Tracks :")
-		for _, item := range tracks.Tracks {
-			b.WriteString("\n- ")
-			b.WriteString(item.Name)
-			b.WriteString(" [ ")
-			b.WriteString(item.Album.Name)
-			b.WriteString(" ] --  ")
-			b.WriteString(joinArtists(item.Artists, ", "))
+		var tt topTrack
+		var tracks []topTrack
+		for _, item := range userTracks.Tracks {
+			tt.Name = item.Name
+			tt.Album = item.Album.Name
+			tt.Artists = joinArtists(item.Artists, ", ")
+			tt.URL = item.ExternalURLs["spotify"]
+			tt.Image = item.Album.Images[1].URL
+			tracks = append(tracks, tt)
 		}
-		c.String(http.StatusOK, b.String())
+		c.HTML(
+			http.StatusOK,
+			"tracks.html",
+			gin.H{
+				"Tracks": tracks,
+				"title":  "Tracks",
+			},
+		)
+
 	}()
 }
 
@@ -375,13 +362,31 @@ func playlists(c *gin.Context) {
 			log.Panic(err)
 			c.String(http.StatusNotFound, err.Error())
 		}
-		var b strings.Builder
-		b.WriteString("Playlists:")
-		for _, item := range playlists.Playlists {
-			b.WriteString("\n- ")
-			b.WriteString(item.Name)
+		type playlist struct {
+			Name   string
+			Owner  string
+			URL    string
+			Image  string
+			Tracks uint
 		}
-		c.String(http.StatusOK, b.String())
+		var pl playlist
+		var pls []playlist
+		for _, item := range playlists.Playlists {
+			pl.Name = item.Name
+			pl.Owner = item.Owner.DisplayName
+			pl.URL = item.ExternalURLs["spotify"]
+			pl.Image = item.Images[0].URL
+			pl.Tracks = item.Tracks.Total
+			pls = append(pls, pl)
+		}
+		c.HTML(
+			http.StatusOK,
+			"playlists.html",
+			gin.H{
+				"Playlists": pls,
+				"title":     "Playlists",
+			},
+		)
 	}()
 }
 
@@ -395,20 +400,36 @@ func albums(c *gin.Context) {
 
 	defer func() {
 		// use the client to make calls that require authorization
-		albums, err := client.CurrentUsersAlbums()
+		userAlbums, err := client.CurrentUsersAlbums()
 		if err != nil {
 			log.Panic(err)
 			c.String(http.StatusNotFound, err.Error())
 		}
-		var b strings.Builder
-		b.WriteString("Albums:")
-		for _, item := range albums.Albums {
-			b.WriteString("\n- ")
-			b.WriteString(item.Name)
-			b.WriteString(" --  ")
-			b.WriteString(joinArtists(item.Artists, ", "))
+		type albums struct {
+			Name    string
+			Artists string
+			URL     string
+			Image   string
+			Tracks  int
 		}
-		c.String(http.StatusOK, b.String())
+		var al albums
+		var als []albums
+		for _, item := range userAlbums.Albums {
+			al.Name = item.Name
+			al.Artists = joinArtists(item.Artists, ", ")
+			al.URL = item.ExternalURLs["spotify"]
+			al.Image = item.Images[1].URL
+			al.Tracks = item.Tracks.Total
+			als = append(als, al)
+		}
+		c.HTML(
+			http.StatusOK,
+			"albums.html",
+			gin.H{
+				"Albums": als,
+				"title":  "Albums",
+			},
+		)
 	}()
 }
 
@@ -564,6 +585,86 @@ func recommend(c *gin.Context) {
 	}()
 }
 
+/* recent - display recently played tracks
+and save(update) recently played tracks to Cloud Firestore database
+*/
+func recent(c *gin.Context) {
+	client := clientMagic(c)
+	if client == nil {
+		return
+	}
+
+	defer func() {
+		// use the client to make calls that require authorization
+		recentlyPlayed, err := client.PlayerRecentlyPlayed()
+		if err != nil {
+			log.Panic(err)
+			c.String(http.StatusNotFound, err.Error())
+		}
+		ctx := context.Background()
+		firestoreClient := initFirestoreDatabase(ctx)
+		// Get a new write batch.
+		batch := firestoreClient.Batch()
+		defer firestoreClient.Close()
+		for _, item := range recentlyPlayed {
+			artists := joinArtists(item.Track.Artists, ", ")
+			playedAt := item.PlayedAt
+			recentlyPlayedRef := firestoreClient.Collection("recently_played").Doc(string(item.Track.ID))
+			batch.Set(recentlyPlayedRef, map[string]interface{}{
+				"played_at":  playedAt,
+				"track_name": item.Track.Name,
+				"artists":    artists,
+			}, firestore.MergeAll) // Overwrite only the fields in the map; preserve all others.
+		}
+		// Commit the batch.
+		_, errBatch := batch.Commit(ctx)
+		if errBatch != nil {
+			// Handle any errors in an appropriate way, such as returning them.
+			log.Panic("An error while commiting batch to firestore: %s", err.Error())
+		}
+		c.String(http.StatusOK, "OK")
+	}()
+}
+
+/* midnight - endpoint to clean tracks history from Cloud Firestore database
+NOT USED - we keep tracks history for a time
+*/
+func midnight(c *gin.Context) {
+	ctx := context.Background()
+	firestoreClient := initFirestoreDatabase(ctx)
+	defer firestoreClient.Close()
+	batchSize := 20
+	ref := firestoreClient.Collection("recently_played")
+	for {
+		// Get a batch of documents
+		iter := ref.Limit(batchSize).Documents(ctx)
+		numDeleted := 0
+		// Iterate through the documents, adding a delete operation for each one to a
+		// WriteBatch.
+		batch := firestoreClient.Batch()
+		for {
+			doc, err := iter.Next()
+			if err == iterator.Done {
+				break
+			}
+			if err != nil {
+				log.Println(err.Error())
+			}
+			batch.Delete(doc.Ref)
+			numDeleted++
+		}
+		// If there are no documents to delete, the process is over.
+		if numDeleted == 0 {
+			break
+		}
+		_, err := batch.Commit(ctx)
+		if err != nil {
+			log.Println(err.Error())
+		}
+	}
+	c.String(http.StatusOK, "Midnight Run - starring Robert DeNiro")
+}
+
 /* spot - recommend tracks based on user top artists
 recommeded tracks could replace default mood playlist
 or any other (based on passed parameters)
@@ -611,65 +712,6 @@ func spot(c *gin.Context) {
 		}
 
 		c.String(http.StatusOK, b.String())
-	}()
-}
-
-/* moodFromHistory - recommends tracks based on current mood
-(recently played tracks) [Firestore version]
-recommeded tracks could replace default mood playlist
-or any other (based on passed parameters)
-r=1 - replace, p=[ID]
-*/
-func moodFromHistory(c *gin.Context) {
-	endpoint := c.Request.URL.Path
-	replaceCookie, cookieErr := c.Cookie("replace_playlist")
-	playlistCookie, _ := c.Cookie("playlist_ID")
-	if cookieErr != nil {
-		c.SetCookie("replace_playlist", c.Query("r"), cookieLifetime, endpoint, "", false, true)
-		c.SetCookie("playlist_ID", c.DefaultQuery("p", defaultMoodPlaylistID), cookieLifetime, endpoint, "", false, true)
-	}
-	log.Printf("Cookie values: %s %s \n", replaceCookie, playlistCookie)
-	client := clientMagic(c)
-	if client == nil {
-		return
-	}
-
-	defer func() {
-		spotTracks, err := recommendFromHistory(client)
-		if err != nil {
-			log.Println(err.Error())
-			c.String(http.StatusNotFound, err.Error())
-			return
-		}
-		if replace := c.DefaultQuery("r", replaceCookie); replace == "1" {
-			playlist := c.DefaultQuery("p", playlistCookie)
-			recommendedPlaylistID := spotify.ID(playlist)
-			chunks := chunkIDs(getSpotifyIDs(spotTracks), pageLimit)
-			err = client.ReplacePlaylistTracks(recommendedPlaylistID, chunks[0]...)
-			if err == nil {
-				log.Println("Tracks added")
-			} else {
-				log.Println(err.Error())
-			}
-		}
-		var tt topTrack
-		var tracks []topTrack
-		for _, item := range spotTracks {
-			tt.Name = item.Name
-			tt.Album = item.Album.Name
-			tt.Artists = joinArtists(item.Artists, ", ")
-			tt.URL = item.ExternalURLs["spotify"]
-			tt.Image = item.Album.Images[1].URL
-			tracks = append(tracks, tt)
-		}
-		c.HTML(
-			http.StatusOK,
-			"mood.html",
-			gin.H{
-				"Tracks": tracks,
-				"title":  "Mood",
-			},
-		)
 	}()
 }
 
