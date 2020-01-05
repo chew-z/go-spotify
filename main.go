@@ -27,25 +27,24 @@ func init() {
 	router.GET("/", func(c *gin.Context) {
 		c.HTML(http.StatusOK, "main.html", gin.H{})
 	})
-	router.GET("/chart", popularAnalysis)
+	router.GET("/chart", analysis)
 	// internal pages
 	router.GET("/callback", callback)
-	router.GET("/recent", recent)
+	router.POST("/recent", recent)
 	// HTML pages
 	router.GET("/top", top)
 	router.GET("/popular", popular)
 	router.GET("/history", history)
 	router.GET("/mood", moodFromHistory)
 	router.GET("/user", user)
-	// TXT pages TODO
 	router.GET("/tracks", tracks)
 	router.GET("/playlists", playlists)
 	router.GET("/albums", albums)
+	// TXT pages TODO
 	router.GET("/artists", artists)
 	router.GET("/search", search)
 	router.GET("/recommend", recommend)
 	router.GET("/spot", spot)
-	router.GET("/analyze", analyze)
 	// DISABLED
 	// router.GET("/midnight", midnight)
 

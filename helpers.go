@@ -155,6 +155,7 @@ func recommendFromHistory(client *spotify.Client) ([]spotify.FullTrack, error) {
 	iter := firestoreClient.Collection("recently_played").OrderBy("played_at", firestore.Desc).Limit(24).Documents(ctx)
 	var tr firestoreTrack
 	// fiil in recentTracksIDs
+	defer iter.Stop()
 	for {
 		doc, err := iter.Next()
 		if err == iterator.Done {
@@ -289,6 +290,30 @@ func recommendFromTop(client *spotify.Client) ([]spotify.FullTrack, error) {
 	return tracks, nil
 }
 
+func miniAudioFeatures(ids []spotify.ID, client *spotify.Client) *[]audioTrack {
+	var f audioTrack
+	var audioTracks []audioTrack
+	chunks := chunkIDs(ids, pageLimit)
+	audioFeatures, _ := client.GetAudioFeatures(chunks[0]...) // GetAudioFeatures has variadic argument
+	fullTracks, _ := fullTrackGetMany(client, chunks[0])
+	for i, res := range audioFeatures {
+		if res.ID != fullTracks[i].ID {
+			log.Println("miniAudioFeatures: NOT IN SYNC")
+		}
+		f.ID = res.ID
+		f.Name = fullTracks[i].Name
+		f.Artists = joinArtists(fullTracks[i].Artists, ", ")
+		f.Energy = int(100.0 * res.Energy)
+		f.Loudness = int(-1.66 * res.Loudness)
+		f.Tempo = int(res.Tempo - 100.0)
+		f.Instrumentalness = int(100.0 * res.Instrumentalness)
+		f.Acousticness = int(100.0 * res.Acousticness)
+		f.URL = fullTracks[i].ExternalURLs["spotify"]
+		audioTracks = append(audioTracks, f)
+	}
+	return &audioTracks
+}
+
 /* getTrackAttributes - return averaged attributes for set of tracks
  */
 func getTrackAttributes(client *spotify.Client, tracks []spotify.FullTrack) (*spotify.TrackAttributes, error) {
@@ -369,79 +394,6 @@ func handleSearchResults(results *spotify.SearchResult) string {
 		b.WriteString("\nArtists:\n")
 		for _, item := range results.Artists.Artists {
 			b.WriteString(fmt.Sprintf("- %s : %s\n", item.Name, strconv.Itoa(item.Popularity)))
-		}
-	}
-	return b.String()
-}
-
-func miniAudioFeatures(ids []spotify.ID, client *spotify.Client) *[]audioTrack {
-	var f audioTrack
-	var audioTracks []audioTrack
-	chunks := chunkIDs(ids, pageLimit)
-	audioFeatures, _ := client.GetAudioFeatures(chunks[0]...) // GetAudioFeatures has variadic argument
-	fullTracks, _ := fullTrackGetMany(client, chunks[0])      // GetAudioFeatures has variadic argument
-	for i, res := range audioFeatures {
-		f.ID = res.ID
-		f.Name = fullTracks[i].Name
-		f.Energy = int(100.0 * res.Energy)
-		f.Loudness = int(-1.66 * res.Loudness)
-		f.Tempo = int(res.Tempo - 100.0)
-		f.Instrumentalness = int(100.0 * res.Instrumentalness)
-		f.Acousticness = int(100.0 * res.Acousticness)
-		f.URL = fullTracks[i].ExternalURLs["spotify"]
-		audioTracks = append(audioTracks, f)
-	}
-	return &audioTracks
-}
-
-/* handleSearchResults - pretty print search results with acoustic attributes
- */
-func handleAudioFeatures(results *spotify.SearchResult, client *spotify.Client) string {
-	var b strings.Builder
-
-	b.WriteString("Analysis:\n")
-	b.WriteString("Energy, Valence, Loud, Tempo, Acoustic, Instrumental, Dance, Speach\n")
-	if results.Tracks != nil {
-		tracks := results.Tracks.Tracks
-		var tr []spotify.ID
-		for _, item := range tracks {
-			b.WriteString(fmt.Sprintf(" - %s - %s:\n", item.Name, item.Artists[0].Name))
-			tr = append(tr, item.ID)
-		}
-		// using multiple track.IDs at once saves us many, many calls to Spotify
-		audioFeatures, _ := client.GetAudioFeatures(tr...) // GetAudioFeatures has variadic argument
-		for _, res := range audioFeatures {
-			b.WriteString(fmt.Sprintf("  %.4f | %.4f | %.4f | %.4f |", res.Energy, res.Valence, res.Loudness, res.Tempo))
-			b.WriteString(fmt.Sprintf(" %.4f | %.4f |", res.Acousticness, res.Instrumentalness))
-			b.WriteString(fmt.Sprintf(" %.4f | %.4f |", res.Danceability, res.Speechiness))
-			b.WriteString("\n")
-			// b.WriteString(fmt.Sprintf("\n%v\n%v\n", res.AnalysisURL, res.TrackURL))
-		}
-	}
-	if results.Playlists != nil {
-		playlists := results.Playlists.Playlists
-		for i, pl := range playlists {
-			if i >= maxLists {
-				break
-			}
-			playlist, _ := client.GetPlaylist(pl.ID)
-			b.WriteString(fmt.Sprintf("\n  %s - %s\n", playlist.Name, playlist.Description))
-			var tr []spotify.ID
-			for j, item := range playlist.Tracks.Tracks {
-				if j >= maxTracks {
-					break
-				}
-				b.WriteString(fmt.Sprintf(" - %s - %s:\n", item.Track.Name, item.Track.Artists[0].Name))
-				tr = append(tr, item.Track.ID)
-			}
-			// using multiple track.IDs at once saves us many, many calls to Spotify
-			audioFeatures, _ := client.GetAudioFeatures(tr...) // GetAudioFeatures has variadic argument
-			for _, res := range audioFeatures {
-				b.WriteString(fmt.Sprintf("  %.4f | %.4f | %.4f | %.4f |", res.Energy, res.Valence, res.Loudness, res.Tempo))
-				b.WriteString(fmt.Sprintf(" %.4f | %.4f |", res.Acousticness, res.Instrumentalness))
-				b.WriteString(fmt.Sprintf(" %.4f | %.4f |", res.Danceability, res.Speechiness))
-				b.WriteString("\n")
-			}
 		}
 	}
 	return b.String()

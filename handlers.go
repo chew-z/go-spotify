@@ -39,6 +39,7 @@ type topTrack struct {
 type audioTrack struct {
 	ID               spotify.ID
 	Name             string
+	Artists          string
 	Energy           int
 	Loudness         int
 	Tempo            int
@@ -51,7 +52,7 @@ const (
 	maxLists              = 5
 	maxTracks             = 5
 	pageLimit             = 25
-	cookieLifetime        = 10
+	cookieLifetime        = 15
 	defaultMoodPlaylistID = "7vUhitas9hJkonwMx5t0z5"
 )
 
@@ -202,7 +203,14 @@ func popular(c *gin.Context) {
 		)
 	}()
 }
-func popularAnalysis(c *gin.Context) {
+func analysis(c *gin.Context) {
+	endpoint := c.Request.URL.Path
+	analysisCookie, err := c.Cookie("analysis_type")
+	if err != nil {
+		c.SetCookie("analysis_type", c.DefaultQuery("t", "history"), cookieLifetime, endpoint, "", false, true)
+	}
+	log.Printf("Cookie values: %s \n", analysisCookie)
+
 	client := clientMagic(c)
 	if client == nil {
 		return
@@ -211,10 +219,17 @@ func popularAnalysis(c *gin.Context) {
 		ctx := context.Background()
 		firestoreClient := initFirestoreDatabase(ctx)
 		defer firestoreClient.Close()
-		pops := firestoreClient.Collection("popular_tracks").OrderBy("count", firestore.Desc).Limit(pageLimit).Documents(ctx)
+		var q firestore.Query
+		if aT := c.DefaultQuery("t", analysisCookie); aT == "popular" {
+			q = firestoreClient.Collection("popular_tracks").OrderBy("count", firestore.Desc).Limit(pageLimit)
+		} else {
+			q = firestoreClient.Collection("recently_played").OrderBy("played_at", firestore.Desc).Limit(pageLimit)
+		}
+		iter := q.Documents(ctx)
 		trackIDs := []spotify.ID{}
+		defer iter.Stop()
 		for {
-			doc, err := pops.Next()
+			doc, err := iter.Next()
 			if err == iterator.Done {
 				break
 			}
@@ -225,21 +240,6 @@ func popularAnalysis(c *gin.Context) {
 			trackIDs = append(trackIDs, trackID)
 		}
 		data := miniAudioFeatures(trackIDs, client)
-		// topTracks, err := fullTrackGetMany(client, trackIDs)
-		// if err != nil {
-		// 	log.Println(err.Error())
-		// }
-		// var tt topTrack
-		// var tracks []topTrack
-		// for i := range toplist {
-		// 	tt.Count = toplist[i]
-		// 	tt.Name = topTracks[i].Name
-		// 	tt.Artists = joinArtists(topTracks[i].Artists, ", ")
-		// 	tt.URL = topTracks[i].ExternalURLs["spotify"]
-		// 	tt.Image = topTracks[i].Album.Images[1].URL
-		// 	tracks = append(tracks, tt)
-		// }
-		// Call the HTML method of the Context to render a template
 		c.HTML(
 			http.StatusOK,
 			"chart.html",
@@ -260,6 +260,7 @@ func history(c *gin.Context) {
 	iter := firestoreClient.Collection("recently_played").OrderBy("played_at", firestore.Desc).Limit(pageLimit).Documents(ctx)
 	var tr firestoreTrack
 	var tracks []firestoreTrack
+	defer iter.Stop()
 	for {
 		doc, err := iter.Next()
 		if err == iterator.Done {
@@ -549,40 +550,6 @@ func search(c *gin.Context) {
 	}()
 }
 
-/* analyze - search for tracks and display
-analysis of results
-*/
-func analyze(c *gin.Context) {
-	endpoint := c.Request.URL.Path
-	qCookie, cookieErr := c.Cookie("search_query")
-	cCookie, _ := c.Cookie("search_category")
-	if cookieErr != nil {
-		qCookie = "NotSet"
-		cCookie = "NotSet"
-		c.SetCookie("search_query", c.Query("q"), cookieLifetime, endpoint, "", false, true)
-		c.SetCookie("search_category", c.Query("c"), cookieLifetime, endpoint, "", false, true)
-	}
-	log.Printf("Cookie values: %s %s \n", qCookie, cCookie)
-	client := clientMagic(c)
-	if client == nil {
-		return
-	}
-
-	defer func() {
-		query := c.DefaultQuery("q", qCookie)
-		searchCategory := c.DefaultQuery("c", cCookie)
-		searchType := searchType(searchCategory)
-		results, err := client.Search(query, searchType)
-		if err != nil {
-			log.Println(err.Error())
-			c.String(http.StatusNotFound, err.Error())
-			return
-		}
-		resString := handleAudioFeatures(results, client)
-		c.String(http.StatusOK, resString)
-	}()
-}
-
 /* recommend songs based on given tracks (maximum 5)
 accepts query parameters t1..t5 with trackIDs.
 prints recommended tracks
@@ -680,7 +647,7 @@ func recent(c *gin.Context) {
 			// Handle any errors in an appropriate way, such as returning them.
 			log.Panic("An error while commiting batch to firestore: %s", err.Error())
 		}
-		c.String(http.StatusOK, "OK")
+		c.JSON(http.StatusOK, gin.H{"message": "OK"})
 	}()
 }
 
