@@ -1,8 +1,10 @@
 package main
 
 import (
+	"context"
 	"net/http"
 
+	"cloud.google.com/go/firestore"
 	"github.com/gin-gonic/gin"
 )
 
@@ -12,11 +14,18 @@ like 403 lack of scope, unexpected endpoint etc.
 
 -- save/retrieve token in firestore
 */
+var (
+	firestoreClient *firestore.Client
+	ctx             = context.Background()
+)
 
 func main() {
+	defer firestoreClient.Close()
 }
 
 func init() {
+	firestoreClient = initFirestoreDatabase(ctx)
+
 	router := gin.Default()
 	router.Static("/static", "./static")
 	router.StaticFile("/favicon.ico", "./favicon.ico")
@@ -49,4 +58,5 @@ func init() {
 	// router.GET("/midnight", midnight)
 
 	router.Run()
+
 }

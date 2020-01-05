@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"log"
 	"strconv"
@@ -92,9 +91,6 @@ func getClient(endpoint string) *spotify.Client {
 }
 
 func getTokenFromDB(endpoint string) (*oauth2.Token, error) {
-	ctx := context.Background() // reuse your context
-	firestoreClient := initFirestoreDatabase(ctx)
-	defer firestoreClient.Close()
 	tokenID := strings.TrimPrefix(endpoint, "/")
 	dsnap, err := firestoreClient.Collection("tokens").Doc(tokenID).Get(ctx)
 	if err != nil {
@@ -108,9 +104,6 @@ func getTokenFromDB(endpoint string) (*oauth2.Token, error) {
 }
 
 func saveTokenToDB(endpoint string, token *oauth2.Token) {
-	ctx := context.Background() // reuse your context
-	firestoreClient := initFirestoreDatabase(ctx)
-	defer firestoreClient.Close()
 	tokenID := strings.TrimPrefix(endpoint, "/")
 	_, err := firestoreClient.Collection("tokens").Doc(tokenID).Set(ctx, token)
 
@@ -123,9 +116,6 @@ func saveTokenToDB(endpoint string, token *oauth2.Token) {
 }
 
 func updateTokenInDB(endpoint string, token *oauth2.Token) {
-	ctx := context.Background() // reuse your context
-	firestoreClient := initFirestoreDatabase(ctx)
-	defer firestoreClient.Close()
 	tokenID := strings.TrimPrefix(endpoint, "/")
 	_, err := firestoreClient.Collection("tokens").Doc(tokenID).Set(ctx, map[string]interface{}{
 		"AccessToken":  token.AccessToken,
@@ -149,9 +139,6 @@ TODO - add limit as parameter (short, medium, long)
 func recommendFromHistory(client *spotify.Client) ([]spotify.FullTrack, error) {
 	recommendedTracks := []spotify.FullTrack{}
 	recentTracksIDs := []spotify.ID{}
-	ctx := context.Background()
-	firestoreClient := initFirestoreDatabase(ctx)
-	defer firestoreClient.Close()
 	iter := firestoreClient.Collection("recently_played").OrderBy("played_at", firestore.Desc).Limit(24).Documents(ctx)
 	var tr firestoreTrack
 	// fiil in recentTracksIDs

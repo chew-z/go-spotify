@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"log"
 	"net/http"
@@ -57,14 +56,13 @@ const (
 )
 
 var (
-	countryPoland   = "PL"
-	location, _     = time.LoadLocation("Europe/Warsaw")
-	kaszka          = cache.New(60*time.Minute, 1*time.Minute)
-	auth            = spotify.NewAuthenticator(redirectURI, spotify.ScopeUserReadPrivate, spotify.ScopeUserTopRead, spotify.ScopeUserLibraryRead, spotify.ScopeUserFollowRead, spotify.ScopeUserReadRecentlyPlayed, spotify.ScopePlaylistModifyPublic, spotify.ScopePlaylistModifyPrivate)
-	clientChannel   = make(chan *spotify.Client)
-	redirectURI     = os.Getenv("REDIRECT_URI")
-	firestoreClient *firestore.Client
-	storeToken      = map[string]bool{
+	countryPoland = "PL"
+	location, _   = time.LoadLocation("Europe/Warsaw")
+	kaszka        = cache.New(60*time.Minute, 1*time.Minute)
+	auth          = spotify.NewAuthenticator(redirectURI, spotify.ScopeUserReadPrivate, spotify.ScopeUserTopRead, spotify.ScopeUserLibraryRead, spotify.ScopeUserFollowRead, spotify.ScopeUserReadRecentlyPlayed, spotify.ScopePlaylistModifyPublic, spotify.ScopePlaylistModifyPrivate)
+	clientChannel = make(chan *spotify.Client)
+	redirectURI   = os.Getenv("REDIRECT_URI")
+	storeToken    = map[string]bool{
 		"/user":   true,
 		"/recent": true,
 		"/mood":   true,
@@ -156,9 +154,6 @@ func popular(c *gin.Context) {
 	}
 
 	defer func() {
-		ctx := context.Background()
-		firestoreClient := initFirestoreDatabase(ctx)
-		defer firestoreClient.Close()
 		pops := firestoreClient.Collection("popular_tracks").OrderBy("count", firestore.Desc).Limit(pageLimit).Documents(ctx)
 		var pt popularTrack
 		var toplist []int
@@ -216,9 +211,6 @@ func analysis(c *gin.Context) {
 		return
 	}
 	defer func() {
-		ctx := context.Background()
-		firestoreClient := initFirestoreDatabase(ctx)
-		defer firestoreClient.Close()
 		var q firestore.Query
 		if aT := c.DefaultQuery("t", analysisCookie); aT == "popular" {
 			q = firestoreClient.Collection("popular_tracks").OrderBy("count", firestore.Desc).Limit(pageLimit)
@@ -254,9 +246,6 @@ func analysis(c *gin.Context) {
 /* history - read saved tracks from Cloud Firestore database
  */
 func history(c *gin.Context) {
-	ctx := context.Background()
-	firestoreClient := initFirestoreDatabase(ctx)
-	defer firestoreClient.Close()
 	iter := firestoreClient.Collection("recently_played").OrderBy("played_at", firestore.Desc).Limit(pageLimit).Documents(ctx)
 	var tr firestoreTrack
 	var tracks []firestoreTrack
@@ -626,11 +615,8 @@ func recent(c *gin.Context) {
 			log.Panic(err)
 			c.String(http.StatusNotFound, err.Error())
 		}
-		ctx := context.Background()
-		firestoreClient := initFirestoreDatabase(ctx)
 		// Get a new write batch.
 		batch := firestoreClient.Batch()
-		defer firestoreClient.Close()
 		for _, item := range recentlyPlayed {
 			artists := joinArtists(item.Track.Artists, ", ")
 			playedAt := item.PlayedAt
@@ -655,9 +641,6 @@ func recent(c *gin.Context) {
 NOT USED - we keep tracks history for a time
 */
 func midnight(c *gin.Context) {
-	ctx := context.Background()
-	firestoreClient := initFirestoreDatabase(ctx)
-	defer firestoreClient.Close()
 	batchSize := 20
 	ref := firestoreClient.Collection("recently_played")
 	for {
