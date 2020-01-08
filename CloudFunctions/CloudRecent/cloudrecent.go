@@ -53,7 +53,6 @@ func init() {
 func CloudRecent(w http.ResponseWriter, r *http.Request) {
 	iter := firestoreClient.Collection("users").Documents(ctx)
 	docs, err := iter.GetAll()
-	log.Printf("%v", docs)
 	if err != nil {
 		log.Println(err.Error())
 	}
@@ -64,7 +63,7 @@ func CloudRecent(w http.ResponseWriter, r *http.Request) {
 		var client spotify.Client
 		// fmt.Println(i, doc.Ref.ID)
 		user := doc.Data()["userID"].(string)
-		fmt.Println(user)
+		log.Printf("user: %s", user)
 		newTok.user = user
 		newTok.path = "/user"
 		tok, err := getTokenFromDB(&newTok)

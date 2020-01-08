@@ -374,36 +374,36 @@ func moodFromHistory(c *gin.Context) {
 		if err != nil {
 			log.Println(err.Error())
 			c.String(http.StatusNotFound, err.Error())
-			if replace := c.DefaultQuery("r", replaceCookie); replace == "1" {
-				playlist := c.DefaultQuery("p", playlistCookie)
-				recommendedPlaylistID := spotify.ID(playlist)
-				chunks := chunkIDs(getSpotifyIDs(spotTracks), pageLimit)
-				err = client.ReplacePlaylistTracks(recommendedPlaylistID, chunks[0]...)
-				if err == nil {
-					log.Println("Tracks added")
-				} else {
-					log.Println(err.Error())
-				}
-			}
-			var tt topTrack
-			var tracks []topTrack
-			for _, item := range spotTracks {
-				tt.Name = item.Name
-				tt.Album = item.Album.Name
-				tt.Artists = joinArtists(item.Artists, ", ")
-				tt.URL = item.ExternalURLs["spotify"]
-				tt.Image = item.Album.Images[1].URL
-				tracks = append(tracks, tt)
-			}
-			c.HTML(
-				http.StatusOK,
-				"mood.html",
-				gin.H{
-					"Tracks": tracks,
-					"title":  "Mood",
-				},
-			)
 		}
+		if replace := c.DefaultQuery("r", replaceCookie); replace == "1" {
+			playlist := c.DefaultQuery("p", playlistCookie)
+			recommendedPlaylistID := spotify.ID(playlist)
+			chunks := chunkIDs(getSpotifyIDs(spotTracks), pageLimit)
+			err = client.ReplacePlaylistTracks(recommendedPlaylistID, chunks[0]...)
+			if err == nil {
+				log.Println("Tracks added")
+			} else {
+				log.Println(err.Error())
+			}
+		}
+		var tt topTrack
+		var tracks []topTrack
+		for _, item := range spotTracks {
+			tt.Name = item.Name
+			tt.Album = item.Album.Name
+			tt.Artists = joinArtists(item.Artists, ", ")
+			tt.URL = item.ExternalURLs["spotify"]
+			tt.Image = item.Album.Images[1].URL
+			tracks = append(tracks, tt)
+		}
+		c.HTML(
+			http.StatusOK,
+			"mood.html",
+			gin.H{
+				"Tracks": tracks,
+				"title":  "Mood",
+			},
+		)
 		return
 	}
 	c.JSON(http.StatusTeapot, gin.H{"/moodFromHistory": "failed to find  client"})
