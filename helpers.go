@@ -5,12 +5,9 @@ import (
 	"log"
 	"strconv"
 	"strings"
-	"time"
 
 	"cloud.google.com/go/firestore"
-	"github.com/gin-gonic/gin"
 	"github.com/zmb3/spotify"
-	"golang.org/x/oauth2"
 	"google.golang.org/api/iterator"
 )
 
@@ -35,103 +32,6 @@ type recommendationParameters struct {
 	MinTrackCount   int
 }
 
-func clientMagic(c *gin.Context) *spotify.Client {
-	endpoint := c.Request.URL.Path
-	client := getClient(endpoint)
-	deuceCookie, _ := c.Cookie("deuce")
-	log.Printf("Deuce: %s ", deuceCookie)
-
-	if client == nil { // get client from oauth
-		if deuceCookie == "1" { // wait for auth to complete
-			client = <-clientChannel
-			log.Printf("%s: Login Completed!", endpoint)
-		} else { // redirect to auth URL and exit
-			url := auth.AuthURL(endpoint)
-			log.Printf("%s: redirecting to %s", endpoint, url)
-			// HTTP standard does not pass through HTTP headers on an 302/301 directive
-			// 303 is never cached and always is GET
-			c.Redirect(303, url)
-			return nil
-		}
-	}
-	return client
-}
-
-/* getClient - restore client for given endpoint/state from cache
-or return nil
-*/
-func getClient(endpoint string) *spotify.Client {
-	if gclient, foundClient := kaszka.Get(endpoint); foundClient {
-		log.Printf("getClient: Cached client found for: %s", endpoint)
-		client := gclient.(*spotify.Client)
-		if tok, err := client.Token(); err != nil {
-			log.Panic(err)
-		} else {
-			log.Printf("getClient: Token will expire in %s", tok.Expiry.Sub(time.Now()).String())
-		}
-		return client
-	}
-	log.Printf("getClient: No cached client found for: %s", endpoint)
-	if storeToken[endpoint] { // token is only stored in database for few endpoints
-		tok, err := getTokenFromDB(endpoint)
-		if err == nil {
-			client := auth.NewClient(tok)
-			kaszka.Set(endpoint, &client, tok.Expiry.Sub(time.Now()))
-			log.Printf("getClient: Cached client for: %s", endpoint)
-			if storeToken[endpoint] {
-				if m, _ := time.ParseDuration("5m30s"); time.Until(tok.Expiry) < m {
-					newToken, _ := client.Token()
-					updateTokenInDB(endpoint, newToken)
-				}
-			}
-			return &client
-		}
-	}
-	return nil
-}
-
-func getTokenFromDB(endpoint string) (*oauth2.Token, error) {
-	tokenID := strings.TrimPrefix(endpoint, "/")
-	dsnap, err := firestoreClient.Collection("tokens").Doc(tokenID).Get(ctx)
-	if err != nil {
-		log.Printf("Error retrieving token from Firestore for endpoint %s %s.\nPossibly it ain't there..", endpoint, err.Error())
-		return nil, err
-	}
-	tok := &oauth2.Token{}
-	dsnap.DataTo(tok)
-	log.Printf("getTokenFromDB: Got token with expiration %s", tok.Expiry.In(location).Format("15:04:05"))
-	return tok, nil
-}
-
-func saveTokenToDB(endpoint string, token *oauth2.Token) {
-	tokenID := strings.TrimPrefix(endpoint, "/")
-	_, err := firestoreClient.Collection("tokens").Doc(tokenID).Set(ctx, token)
-
-	if err != nil {
-		log.Printf("saveToken: Error saving token for endpoint %s %s", endpoint, err.Error())
-	} else {
-		log.Printf("saveToken: Saved token for endpoint %s into Firestore", endpoint)
-		log.Printf("saveToken: Token expiration %s", token.Expiry.In(location).Format("15:04:05"))
-	}
-}
-
-func updateTokenInDB(endpoint string, token *oauth2.Token) {
-	tokenID := strings.TrimPrefix(endpoint, "/")
-	_, err := firestoreClient.Collection("tokens").Doc(tokenID).Set(ctx, map[string]interface{}{
-		"AccessToken":  token.AccessToken,
-		"Expiry":       token.Expiry,
-		"RefreshToken": token.RefreshToken,
-		"TokenType":    token.TokenType,
-	}, firestore.MergeAll)
-
-	if err != nil {
-		log.Printf("updateToken: Error saving token for endpoint %s %s", endpoint, err.Error())
-	} else {
-		log.Printf("updateToken: Saved token for endpoint %s into Firestore", endpoint)
-		log.Printf("updateToken: Token expiration %s", token.Expiry.In(location).Format("15:04:05"))
-	}
-}
-
 /* recommendFromHistory - (like recommendFromMood but latest tracks
 are taken from Firebase store (unique tracks etc.)
 TODO - add limit as parameter (short, medium, long)
@@ -139,7 +39,12 @@ TODO - add limit as parameter (short, medium, long)
 func recommendFromHistory(client *spotify.Client) ([]spotify.FullTrack, error) {
 	recommendedTracks := []spotify.FullTrack{}
 	recentTracksIDs := []spotify.ID{}
-	iter := firestoreClient.Collection("recently_played").OrderBy("played_at", firestore.Desc).Limit(24).Documents(ctx)
+	user, err := client.CurrentUser()
+	if err != nil {
+		log.Panic(err)
+	}
+	path := fmt.Sprintf("users/%s/recently_played", string(user.ID))
+	iter := firestoreClient.Collection(path).OrderBy("played_at", firestore.Desc).Limit(24).Documents(ctx)
 	var tr firestoreTrack
 	// fiil in recentTracksIDs
 	defer iter.Stop()
@@ -296,6 +201,7 @@ func miniAudioFeatures(ids []spotify.ID, client *spotify.Client) *[]audioTrack {
 		f.Instrumentalness = int(100.0 * res.Instrumentalness)
 		f.Acousticness = int(100.0 * res.Acousticness)
 		f.URL = fullTracks[i].ExternalURLs["spotify"]
+		f.Image = fullTracks[i].Album.Images[2].URL
 		audioTracks = append(audioTracks, f)
 	}
 	return &audioTracks

@@ -9,7 +9,9 @@ import (
 	"time"
 
 	"cloud.google.com/go/firestore"
+	"github.com/gin-gonic/contrib/sessions"
 	"github.com/gin-gonic/gin"
+	guuid "github.com/google/uuid"
 	"github.com/patrickmn/go-cache"
 	"github.com/zmb3/spotify"
 	"google.golang.org/api/iterator"
@@ -45,6 +47,7 @@ type audioTrack struct {
 	Instrumentalness int
 	Acousticness     int
 	URL              string
+	Image            string
 }
 
 const (
@@ -58,10 +61,10 @@ const (
 var (
 	countryPoland = "PL"
 	location, _   = time.LoadLocation("Europe/Warsaw")
-	kaszka        = cache.New(60*time.Minute, 1*time.Minute)
+	kaszka        = cache.New(20*time.Minute, 3*time.Minute)
+	redirectURI   = os.Getenv("REDIRECT_URI")
 	auth          = spotify.NewAuthenticator(redirectURI, spotify.ScopeUserReadPrivate, spotify.ScopeUserTopRead, spotify.ScopeUserLibraryRead, spotify.ScopeUserFollowRead, spotify.ScopeUserReadRecentlyPlayed, spotify.ScopePlaylistModifyPublic, spotify.ScopePlaylistModifyPrivate)
 	clientChannel = make(chan *spotify.Client)
-	redirectURI   = os.Getenv("REDIRECT_URI")
 	storeToken    = map[string]bool{
 		"/user":   true,
 		"/recent": true,
@@ -78,29 +81,68 @@ spotify stores persisten cookies behind our back so it is enough?
 func callback(c *gin.Context) {
 	endpoint := c.Request.FormValue("state")
 	log.Printf("/callback: endpoint: %s", endpoint)
-	// Now we need different token for each endpoint = state. Sucks big way!
 	tok, err := auth.Token(endpoint, c.Request)
 	if err != nil {
 		c.String(http.StatusForbidden, "Couldn't get token")
 		log.Panic(err)
-	} else { // save token in database
-		if storeToken[endpoint] {
-			saveTokenToDB(endpoint, tok)
-		}
 	}
-	// create copy of gin.Context to be used inside the goroutine
-	// cCopy := c.Copy()
+	uuid := guuid.New().String()
 	go func() {
 		client := auth.NewClient(tok)
 		log.Println("/callback: Login Completed!")
-		kaszka.Set(endpoint, &client, tok.Expiry.Sub(time.Now()))
+		kaszka.Set(uuid, &client, cache.DefaultExpiration)
 		log.Printf("/callback: Cached client for: %s", endpoint)
 		clientChannel <- &client
 	}()
-	c.SetCookie("deuce", "1", cookieLifetime, endpoint, "", false, true)
-	url := fmt.Sprintf("http://%s%s", c.Request.Host, endpoint)
-	defer c.Redirect(303, url)
-	log.Printf("/callback: redirecting to endpoint %s", url)
+	url := fmt.Sprintf("http://%s%s?endpoint=%s&id=%s", c.Request.Host, "/login", endpoint, uuid)
+	defer func() {
+		log.Printf("callback: redirecting to endpoint %s", url)
+		c.Redirect(303, url)
+	}()
+}
+
+func login(c *gin.Context) {
+	endpoint := c.Query("endpoint") // where to we shall redirect
+	uuid := c.Query("id")
+	if gclient, foundClient := kaszka.Get(uuid); foundClient {
+		log.Printf("/login: Cached client found for: %s", uuid)
+		client := gclient.(*spotify.Client)
+		user, err := client.CurrentUser()
+		if err != nil {
+			log.Panic(err)
+		}
+		newToken, _ := client.Token()
+		log.Println(newToken.Expiry.Sub(time.Now()))
+		// path := fmt.Sprintf("users/%s/tokens%s", string(user.ID), endpoint)
+		var newTok firestoreToken
+		newTok.user = string(user.ID)
+		newTok.path = endpoint
+		newTok.token = newToken
+		saveTokenToDB(&newTok)
+		session := sessions.Default(c)
+		log.Printf("/login: %s", string(user.ID))
+		session.Set("user", string(user.ID))
+		session.Set("authPath", endpoint)
+		session.Set("uuid", uuid)
+		if err := session.Save(); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"login": "failed to set session values"})
+			return
+		}
+		url := fmt.Sprintf("http://%s%s", c.Request.Host, endpoint)
+		c.Redirect(303, url)
+		return
+	}
+	c.JSON(http.StatusTeapot, gin.H{"login": "failed to find cached client"})
+}
+
+func logout(c *gin.Context) {
+	// without clearing Spotify cookie we will be simply re-logged transparently
+	session := sessions.Default(c)
+	session.Clear() // issue #89
+	session.Save()
+	log.Printf("/logout: %s", "bye")
+	url := fmt.Sprintf("http://%s%s", c.Request.Host, "/")
+	c.Redirect(303, url)
 }
 
 /* top - prints user's top tracks (sensible defaults)
@@ -108,11 +150,7 @@ read zmb3/spotify code to learn more
 */
 func top(c *gin.Context) {
 	client := clientMagic(c)
-	if client == nil {
-		return
-	}
-
-	defer func() {
+	if client != nil {
 		// use the client to make calls that require authorization
 		top, err := client.CurrentUsersTopTracks()
 		if err != nil {
@@ -137,7 +175,9 @@ func top(c *gin.Context) {
 				"title":  "Top tracks",
 			},
 		)
-	}()
+		return
+	}
+	c.JSON(http.StatusTeapot, gin.H{"/top": "failed to find  client"})
 }
 
 /* popular - read counter of how many tracks has been played from Firestore
@@ -149,12 +189,18 @@ I see three different ways of doing it:
 */
 func popular(c *gin.Context) {
 	client := clientMagic(c)
-	if client == nil {
-		return
-	}
-
-	defer func() {
-		pops := firestoreClient.Collection("popular_tracks").OrderBy("count", firestore.Desc).Limit(pageLimit).Documents(ctx)
+	if client != nil {
+		session := sessions.Default(c)
+		user := session.Get("user")
+		if user == nil {
+			u, err := client.CurrentUser()
+			if err != nil {
+				log.Panic(err)
+			}
+			user = string(u.ID)
+		}
+		path := fmt.Sprintf("users/%s/popular_tracks", user)
+		pops := firestoreClient.Collection(path).OrderBy("count", firestore.Desc).Limit(pageLimit).Documents(ctx)
 		var pt popularTrack
 		var toplist []int
 		trackIDs := []spotify.ID{}
@@ -196,7 +242,9 @@ func popular(c *gin.Context) {
 				"title":  "Popular tracks",
 			},
 		)
-	}()
+		return
+	}
+	c.JSON(http.StatusTeapot, gin.H{"/popular": "failed to find  client"})
 }
 func analysis(c *gin.Context) {
 	endpoint := c.Request.URL.Path
@@ -208,14 +256,26 @@ func analysis(c *gin.Context) {
 
 	client := clientMagic(c)
 	if client == nil {
+		c.JSON(http.StatusTeapot, gin.H{"/analysis": "failed to find  client"})
 		return
 	}
 	defer func() {
 		var q firestore.Query
+		session := sessions.Default(c)
+		user := session.Get("user")
+		if user == nil {
+			u, err := client.CurrentUser()
+			if err != nil {
+				log.Panic(err)
+			}
+			user = string(u.ID)
+		}
 		if aT := c.DefaultQuery("t", analysisCookie); aT == "popular" {
-			q = firestoreClient.Collection("popular_tracks").OrderBy("count", firestore.Desc).Limit(pageLimit)
+			path := fmt.Sprintf("users/%s/popular_tracks", user)
+			q = firestoreClient.Collection(path).OrderBy("count", firestore.Desc).Limit(pageLimit)
 		} else {
-			q = firestoreClient.Collection("recently_played").OrderBy("played_at", firestore.Desc).Limit(pageLimit)
+			path := fmt.Sprintf("users/%s/recently_played", user)
+			q = firestoreClient.Collection(path).OrderBy("played_at", firestore.Desc).Limit(pageLimit)
 		}
 		iter := q.Documents(ctx)
 		trackIDs := []spotify.ID{}
@@ -246,33 +306,51 @@ func analysis(c *gin.Context) {
 /* history - read saved tracks from Cloud Firestore database
  */
 func history(c *gin.Context) {
-	iter := firestoreClient.Collection("recently_played").OrderBy("played_at", firestore.Desc).Limit(pageLimit).Documents(ctx)
-	var tr firestoreTrack
-	var tracks []firestoreTrack
-	defer iter.Stop()
-	for {
-		doc, err := iter.Next()
-		if err == iterator.Done {
-			break
-		}
-		if err != nil {
-			log.Println(err.Error())
-		}
-		if err := doc.DataTo(&tr); err != nil {
-			log.Println(err.Error())
-		} else {
-			tr.PlayedAt = tr.PlayedAt.In(location) // move time to location
-			tracks = append(tracks, tr)
-		}
+	client := clientMagic(c)
+	if client == nil {
+		c.JSON(http.StatusTeapot, gin.H{"/history": "failed to find  client"})
+		return
 	}
-	c.HTML(
-		http.StatusOK,
-		"history.html",
-		gin.H{
-			"Tracks": tracks,
-			"title":  "Recently Played",
-		},
-	)
+
+	defer func() {
+		session := sessions.Default(c)
+		user := session.Get("user")
+		if user == nil {
+			u, err := client.CurrentUser()
+			if err != nil {
+				log.Panic(err)
+			}
+			user = string(u.ID)
+		}
+		path := fmt.Sprintf("users/%s/recently_played", user)
+		iter := firestoreClient.Collection(path).OrderBy("played_at", firestore.Desc).Limit(pageLimit).Documents(ctx)
+		var tr firestoreTrack
+		var tracks []firestoreTrack
+		defer iter.Stop()
+		for {
+			doc, err := iter.Next()
+			if err == iterator.Done {
+				break
+			}
+			if err != nil {
+				log.Println(err.Error())
+			}
+			if err := doc.DataTo(&tr); err != nil {
+				log.Println(err.Error())
+			} else {
+				tr.PlayedAt = tr.PlayedAt.In(location) // move time to location
+				tracks = append(tracks, tr)
+			}
+		}
+		c.HTML(
+			http.StatusOK,
+			"history.html",
+			gin.H{
+				"Tracks": tracks,
+				"title":  "Recently Played",
+			},
+		)
+	}()
 }
 
 /* moodFromHistory - recommends tracks based on current mood
@@ -291,58 +369,51 @@ func moodFromHistory(c *gin.Context) {
 	}
 	log.Printf("Cookie values: %s %s \n", replaceCookie, playlistCookie)
 	client := clientMagic(c)
-	if client == nil {
-		return
-	}
-
-	defer func() {
+	if client != nil {
 		spotTracks, err := recommendFromHistory(client)
 		if err != nil {
 			log.Println(err.Error())
 			c.String(http.StatusNotFound, err.Error())
-			return
-		}
-		if replace := c.DefaultQuery("r", replaceCookie); replace == "1" {
-			playlist := c.DefaultQuery("p", playlistCookie)
-			recommendedPlaylistID := spotify.ID(playlist)
-			chunks := chunkIDs(getSpotifyIDs(spotTracks), pageLimit)
-			err = client.ReplacePlaylistTracks(recommendedPlaylistID, chunks[0]...)
-			if err == nil {
-				log.Println("Tracks added")
-			} else {
-				log.Println(err.Error())
+			if replace := c.DefaultQuery("r", replaceCookie); replace == "1" {
+				playlist := c.DefaultQuery("p", playlistCookie)
+				recommendedPlaylistID := spotify.ID(playlist)
+				chunks := chunkIDs(getSpotifyIDs(spotTracks), pageLimit)
+				err = client.ReplacePlaylistTracks(recommendedPlaylistID, chunks[0]...)
+				if err == nil {
+					log.Println("Tracks added")
+				} else {
+					log.Println(err.Error())
+				}
 			}
+			var tt topTrack
+			var tracks []topTrack
+			for _, item := range spotTracks {
+				tt.Name = item.Name
+				tt.Album = item.Album.Name
+				tt.Artists = joinArtists(item.Artists, ", ")
+				tt.URL = item.ExternalURLs["spotify"]
+				tt.Image = item.Album.Images[1].URL
+				tracks = append(tracks, tt)
+			}
+			c.HTML(
+				http.StatusOK,
+				"mood.html",
+				gin.H{
+					"Tracks": tracks,
+					"title":  "Mood",
+				},
+			)
 		}
-		var tt topTrack
-		var tracks []topTrack
-		for _, item := range spotTracks {
-			tt.Name = item.Name
-			tt.Album = item.Album.Name
-			tt.Artists = joinArtists(item.Artists, ", ")
-			tt.URL = item.ExternalURLs["spotify"]
-			tt.Image = item.Album.Images[1].URL
-			tracks = append(tracks, tt)
-		}
-		c.HTML(
-			http.StatusOK,
-			"mood.html",
-			gin.H{
-				"Tracks": tracks,
-				"title":  "Mood",
-			},
-		)
-	}()
+		return
+	}
+	c.JSON(http.StatusTeapot, gin.H{"/moodFromHistory": "failed to find  client"})
 }
 
 /* user - displays user identity (display name)
  */
 func user(c *gin.Context) {
 	client := clientMagic(c)
-	if client == nil {
-		return
-	}
-
-	defer func() {
+	if client != nil {
 		// use the client to make calls that require authorization
 		user, err := client.CurrentUser()
 		if err != nil {
@@ -355,7 +426,9 @@ func user(c *gin.Context) {
 				"User": user.DisplayName,
 			},
 		)
-	}()
+		return
+	}
+	c.String(http.StatusTeapot, "I am a teapot, that's all I know")
 }
 
 /* tracks - display some of user's tracks
@@ -363,6 +436,7 @@ func user(c *gin.Context) {
 func tracks(c *gin.Context) {
 	client := clientMagic(c)
 	if client == nil {
+		c.JSON(http.StatusTeapot, gin.H{"message": "failed to find  client"})
 		return
 	}
 
@@ -400,6 +474,7 @@ func tracks(c *gin.Context) {
 func playlists(c *gin.Context) {
 	client := clientMagic(c)
 	if client == nil {
+		c.JSON(http.StatusTeapot, gin.H{"message": "failed to find  client"})
 		return
 	}
 
@@ -443,6 +518,7 @@ func playlists(c *gin.Context) {
 func albums(c *gin.Context) {
 	client := clientMagic(c)
 	if client == nil {
+		c.JSON(http.StatusTeapot, gin.H{"message": "failed to find  client"})
 		return
 	}
 
@@ -486,6 +562,7 @@ func albums(c *gin.Context) {
 func artists(c *gin.Context) {
 	client := clientMagic(c)
 	if client == nil {
+		c.JSON(http.StatusTeapot, gin.H{"message": "failed to find  client"})
 		return
 	}
 
@@ -521,6 +598,7 @@ func search(c *gin.Context) {
 	log.Printf("Cookie values: %s %s \n", qCookie, cCookie)
 	client := clientMagic(c)
 	if client == nil {
+		c.JSON(http.StatusTeapot, gin.H{"message": "failed to find  client"})
 		return
 	}
 
@@ -552,6 +630,7 @@ func recommend(c *gin.Context) {
 	}
 	client := clientMagic(c)
 	if client == nil {
+		c.JSON(http.StatusTeapot, gin.H{"message": "failed to find  client"})
 		return
 	}
 
@@ -599,79 +678,47 @@ func recommend(c *gin.Context) {
 	}()
 }
 
-/* recent - display recently played tracks
-and save(update) recently played tracks to Cloud Firestore database
-*/
-func recent(c *gin.Context) {
-	client := clientMagic(c)
-	if client == nil {
-		return
-	}
-
-	defer func() {
-		// use the client to make calls that require authorization
-		recentlyPlayed, err := client.PlayerRecentlyPlayed()
-		if err != nil {
-			log.Panic(err)
-			c.String(http.StatusNotFound, err.Error())
-		}
-		// Get a new write batch.
-		batch := firestoreClient.Batch()
-		for _, item := range recentlyPlayed {
-			artists := joinArtists(item.Track.Artists, ", ")
-			playedAt := item.PlayedAt
-			recentlyPlayedRef := firestoreClient.Collection("recently_played").Doc(string(item.Track.ID))
-			batch.Set(recentlyPlayedRef, map[string]interface{}{
-				"played_at":  playedAt,
-				"track_name": item.Track.Name,
-				"artists":    artists,
-			}, firestore.MergeAll) // Overwrite only the fields in the map; preserve all others.
-		}
-		// Commit the batch.
-		_, errBatch := batch.Commit(ctx)
-		if errBatch != nil {
-			// Handle any errors in an appropriate way, such as returning them.
-			log.Panic("An error while commiting batch to firestore: %s", err.Error())
-		}
-		c.JSON(http.StatusOK, gin.H{"message": "OK"})
-	}()
-}
-
 /* midnight - endpoint to clean tracks history from Cloud Firestore database
 NOT USED - we keep tracks history for a time
+TODO - make CloudFunction
 */
-func midnight(c *gin.Context) {
-	batchSize := 20
-	ref := firestoreClient.Collection("recently_played")
-	for {
-		// Get a batch of documents
-		iter := ref.Limit(batchSize).Documents(ctx)
-		numDeleted := 0
-		// Iterate through the documents, adding a delete operation for each one to a
-		// WriteBatch.
-		batch := firestoreClient.Batch()
-		for {
-			doc, err := iter.Next()
-			if err == iterator.Done {
-				break
-			}
-			if err != nil {
-				log.Println(err.Error())
-			}
-			batch.Delete(doc.Ref)
-			numDeleted++
-		}
-		// If there are no documents to delete, the process is over.
-		if numDeleted == 0 {
-			break
-		}
-		_, err := batch.Commit(ctx)
-		if err != nil {
-			log.Println(err.Error())
-		}
-	}
-	c.String(http.StatusOK, "Midnight Run - starring Robert DeNiro")
-}
+// func midnight(c *gin.Context) {
+// 	batchSize := 20
+// 	user, err := client.CurrentUser()
+// 	if err != nil {
+// 		log.Panic(err)
+// 	}
+// 	path := fmt.Sprintf("users/%s/recently_played", string(user.ID))
+// 	ref := firestoreClient.Collection(path)
+// 	for {
+// 		// Get a batch of documents
+// 		iter := ref.Limit(batchSize).Documents(ctx)
+// 		numDeleted := 0
+// 		// Iterate through the documents, adding a delete operation for each one to a
+// 		// WriteBatch.
+// 		batch := firestoreClient.Batch()
+// 		for {
+// 			doc, err := iter.Next()
+// 			if err == iterator.Done {
+// 				break
+// 			}
+// 			if err != nil {
+// 				log.Println(err.Error())
+// 			}
+// 			batch.Delete(doc.Ref)
+// 			numDeleted++
+// 		}
+// 		// If there are no documents to delete, the process is over.
+// 		if numDeleted == 0 {
+// 			break
+// 		}
+// 		_, err := batch.Commit(ctx)
+// 		if err != nil {
+// 			log.Println(err.Error())
+// 		}
+// 	}
+// 	c.String(http.StatusOK, "Midnight Run - starring Robert DeNiro")
+// }
 
 /* spot - recommend tracks based on user top artists
 recommeded tracks could replace default mood playlist

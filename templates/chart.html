@@ -6,7 +6,6 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.9.3/Chart.bundle.min.js" integrity="sha256-TQq84xX6vkwR0Qs1qH5ADkP+MvH0W+9E7TdHJsoIQiM=" crossorigin="anonymous"></script>
 
-
 <h4 class="display-4">{{ .title }}</h4>
 
 <div class="container">
@@ -14,18 +13,20 @@
         {{ range .Data }}
         <div class="card">
             <canvas id="{{ .ID }}"></canvas>
-            <div class="card-body">
-                <p class="card-title"><a href="{{ .URL }}">{{.Name}}</a></p>
-                <p class="card-text"><em>{{.Artists}}</em></p>
+            <div class="row no-gutters">
+                <div class="col">
+                    <div class="card-body">
+                        <p class="card-title"><a href="{{ .URL }}">{{.Name}}</a></p>
+                        <p class="card-text"><em>{{.Artists}}</em></p>
+                        <!-- <a href="#" class="btn btn-primary">BUTTON</a> -->
+                    </div>
+                </div>
+
+                <div class="col-auto">
+                    <img class="card-img" src="{{ .Image }}" alt="{{ .Name }}">
+                </div>
             </div>
-        </div>
-        {{ end }}
-    </div>
-</div>
-
-
-<script>
-{{ range .Data }}
+            <script>
 var ctx = document.getElementById('{{ .ID }}').getContext('2d');
 var chart = new Chart(ctx, {
     // The type of chart we want to create
@@ -48,8 +49,11 @@ var chart = new Chart(ctx, {
         }
     }
 });
-{{ end }}
-</script>
+            </script>
+        </div>
+        {{ end }}
+    </div>
+</div>
 
 <!--Embed the footer.html template at this location-->
 {{ template "footer.html" .}}

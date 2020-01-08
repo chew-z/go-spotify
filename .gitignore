@@ -4,6 +4,7 @@ token.json
 deploy.sh
 favicon.png
 bin/**
+CloudFunctions/.env.yaml
 .env.yaml
 *.bak
 *.bak.go

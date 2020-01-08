@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"cloud.google.com/go/firestore"
+	"github.com/gin-gonic/contrib/sessions"
 	"github.com/gin-gonic/gin"
 )
 
@@ -27,6 +28,9 @@ func init() {
 	firestoreClient = initFirestoreDatabase(ctx)
 
 	router := gin.Default()
+	store := sessions.NewCookieStore([]byte("sessionSuperSecret"))
+	router.Use(sessions.Sessions("sessionName", store))
+
 	router.Static("/static", "./static")
 	router.StaticFile("/favicon.ico", "./favicon.ico")
 	// Process the templates at the start so that they don't have to be loaded
@@ -36,26 +40,33 @@ func init() {
 	router.GET("/", func(c *gin.Context) {
 		c.HTML(http.StatusOK, "main.html", gin.H{})
 	})
-	router.GET("/chart", analysis)
-	// internal pages
 	router.GET("/callback", callback)
-	router.POST("/recent", recent)
-	// HTML pages
-	router.GET("/top", top)
-	router.GET("/popular", popular)
-	router.GET("/history", history)
-	router.GET("/mood", moodFromHistory)
-	router.GET("/user", user)
-	router.GET("/tracks", tracks)
-	router.GET("/playlists", playlists)
-	router.GET("/albums", albums)
-	// TXT pages TODO
-	router.GET("/artists", artists)
-	router.GET("/search", search)
-	router.GET("/recommend", recommend)
-	router.GET("/spot", spot)
-	// DISABLED
-	// router.GET("/midnight", midnight)
+	router.GET("/login", login)
+
+	authorized := router.Group("/")
+	authorized.Use(AuthenticationRequired("/user"))
+	{
+		authorized.GET("/logout", logout)
+		authorized.GET("/chart", analysis)
+		// moved to Cloud Function
+		// authorized.POST("/recent", recent)
+		// HTML pages
+		authorized.GET("/top", top)
+		authorized.GET("/popular", popular)
+		authorized.GET("/history", history)
+		authorized.GET("/mood", moodFromHistory)
+		authorized.GET("/user", user)
+		authorized.GET("/tracks", tracks)
+		authorized.GET("/playlists", playlists)
+		authorized.GET("/albums", albums)
+		// TXT pages TODO
+		authorized.GET("/artists", artists)
+		authorized.GET("/search", search)
+		authorized.GET("/recommend", recommend)
+		authorized.GET("/spot", spot)
+		// DISABLED
+		// authorized.GET("/midnight", midnight)
+	}
 
 	router.Run()
 
