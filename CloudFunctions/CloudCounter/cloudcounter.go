@@ -86,10 +86,13 @@ func CloudCounter(ctx context.Context, e FirestoreEvent) error {
 	// log.Println(fullPath)
 	pathParts := strings.Split(fullPath, "/")
 	// collection := pathParts[0]
-	doc := strings.Join(pathParts[1:], "/") // aka track.ID
-	log.Printf("track.ID aka document: %s", doc)
+	userID := pathParts[1] // aka track.ID
+	docID := pathParts[3]  // aka track.ID
+	log.Printf("userID and docID: %s %s", userID, docID)
 	// In order to avoid triggering infinite loop we keep counters in separate collection
-	docRef := firestoreClient.Collection("popular_tracks").Doc(doc)
+	path := fmt.Sprintf("users/%s/popular_tracks", userID)
+	log.Println(path)
+	docRef := firestoreClient.Collection(path).Doc(docID)
 	_, err := docRef.Set(ctx, map[string]interface{}{
 		"count": firestore.Increment(1)}, firestore.MergeAll)
 	// 	// https://cloud.google.com/functions/docs/calling/cloud-firestore#specifying_the_document_path

@@ -91,7 +91,7 @@ func CloudRecent(w http.ResponseWriter, r *http.Request) {
 				"track_name": item.Track.Name,
 				"artists":    artists,
 			}, firestore.MergeAll) // Overwrite only the fields in the map; preserve all others.
-			log.Printf("%s", item.Track.Name)
+			// log.Printf("%s", item.Track.Name)
 			trackCounter++
 		}
 		userCounter++
