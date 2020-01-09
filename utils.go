@@ -15,6 +15,9 @@ import (
 	"google.golang.org/api/option"
 )
 
+/*initFirestoreDatabase - as the name says creates Firestore client
+in Google Cloud it is using project ID, on localhost credentials file
+*/
 func initFirestoreDatabase(ctx context.Context) *firestore.Client {
 	sa := option.WithCredentialsFile(".firebase-credentials.json")
 	firestoreClient, err := firestore.NewClient(ctx, os.Getenv("GOOGLE_CLOUD_PROJECT"), sa)
@@ -24,18 +27,22 @@ func initFirestoreDatabase(ctx context.Context) *firestore.Client {
 	return firestoreClient
 }
 
+/*getRecommendedTracks - gets recommendation based on seed
+ */
 func getRecommendedTracks(client *spotify.Client, params recommendationParameters) ([]spotify.FullTrack, error) {
 	limit := pageLimit
 	tracks := []spotify.FullTrack{}
 	options := spotify.Options{
 		Limit:   &limit,
-		Country: &countryPoland,
+		Country: &countryPoland, // TODO - this and location
 	}
-
+	// get recommendtions (only single page)
 	page, err := client.GetRecommendations(params.Seeds, params.TrackAttributes, &options)
 	if err != nil {
 		return tracks, fmt.Errorf("Failed to get recommendations: %v", err)
 	}
+	// TODO - we might skip both logic before to speed up
+	// all this is only necessary to limit release date
 	fullTracks, err := fullTrackGetMany(client, getSpotifyIDs(page.Tracks))
 	if err != nil {
 		return tracks, err
@@ -52,13 +59,17 @@ func getRecommendedTracks(client *spotify.Client, params recommendationParameter
 	return tracks, nil
 }
 
+/*fullTracksGetMany - gets FullTrack objects for given track IDs
+This is used a lot and pehaps could be speed up
+*/
 func fullTrackGetMany(client *spotify.Client, ids []spotify.ID) ([]spotify.FullTrack, error) {
 	tracks := []spotify.FullTrack{}
 
 	if len(ids) == 0 {
 		return tracks, nil
 	}
-
+	// get results in chunks
+	// TODO we are using single chunk for now
 	chunks := chunkIDs(ids, pageLimit)
 	for _, chunkIDs := range chunks {
 		pointerTracks, err := client.GetTracks(chunkIDs...)
@@ -85,6 +96,8 @@ func fullAlbumGet(client *spotify.Client, id spotify.ID) (spotify.FullAlbum, err
 	return *album, nil
 }
 
+/*chunkIDs - split large vector of spotify IDs into chunks
+ */
 func chunkIDs(ids []spotify.ID, chunkSize int) [][]spotify.ID {
 	chunks := [][]spotify.ID{[]spotify.ID{}}
 
@@ -165,6 +178,8 @@ func getItemPropertyValue(input interface{}, fieldName string) []interface{} {
 	return output
 }
 
+/* jointArtists - merge all artists names into single string
+ */
 func joinArtists(artists []spotify.SimpleArtist, separator string) string {
 	return strings.Join(
 		func() []string {
@@ -178,6 +193,8 @@ func joinArtists(artists []spotify.SimpleArtist, separator string) string {
 	)
 }
 
+/*appendIfUnique - add spotify ID to vector only if it is unique
+ */
 func appendIfUnique(slice []spotify.ID, i spotify.ID) []spotify.ID {
 	for _, ele := range slice {
 		if ele == i {
@@ -187,6 +204,12 @@ func appendIfUnique(slice []spotify.ID, i spotify.ID) []spotify.ID {
 	return append(slice, i)
 }
 
+/* normalizeRecentlyPlayed - my Spotify history has hiccups
+due to poor connection and switching between different players (Chromecast audio)
+so if two tracks are identical and started within 30 seconds take only one
+Spotify should do that (count at least 30 secs as played track) and theoretically does
+ but its not
+*/
 func normalizeRecentlyPlayed(incoming []spotify.RecentlyPlayedItem) []spotify.RecentlyPlayedItem {
 	var outgoing []spotify.RecentlyPlayedItem
 	outgoing = append(outgoing, incoming[0])
@@ -204,6 +227,8 @@ func normalizeRecentlyPlayed(incoming []spotify.RecentlyPlayedItem) []spotify.Re
 	return outgoing
 }
 
+/*averageFloat - as the name suggest it averages vector of floats
+ */
 func averageFloat(values []float64) float64 {
 	var total float64
 	for _, value := range values {
