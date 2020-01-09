@@ -46,16 +46,18 @@ func init() {
 	authorized := router.Group("/")
 	authorized.Use(AuthenticationRequired("/user"))
 	{
-		authorized.GET("/logout", logout)
-		authorized.GET("/chart", analysis)
 		// moved to Cloud Function
 		// authorized.POST("/recent", recent)
 		// HTML pages
 		authorized.GET("/top", top)
 		authorized.GET("/popular", popular)
+		authorized.GET("/chart", analysis)
 		authorized.GET("/history", history)
 		authorized.GET("/mood", moodFromHistory)
 		authorized.GET("/user", user)
+		// HIDDEN from menu
+		authorized.GET("/logout", logout)
+		// TODO - make useful
 		authorized.GET("/tracks", tracks)
 		authorized.GET("/playlists", playlists)
 		authorized.GET("/albums", albums)
@@ -64,7 +66,7 @@ func init() {
 		authorized.GET("/search", search)
 		authorized.GET("/recommend", recommend)
 		authorized.GET("/spot", spot)
-		// DISABLED
+		// DISABLED TODO - move to Cloud Function
 		// authorized.GET("/midnight", midnight)
 	}
 

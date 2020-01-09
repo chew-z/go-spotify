@@ -11,20 +11,6 @@ import (
 	"google.golang.org/api/iterator"
 )
 
-type songListenedAt struct {
-	Track   spotify.SimpleTrack
-	AddedAt string
-}
-
-type songData struct {
-	ID        string `json:"id"`
-	Title     string `json:"title"`
-	Artist    string `json:"artist"`
-	Date      string `json:"date"`
-	Timestamp int    `json:"timestamp"`
-	Reducer   string `json:"reducer"`
-}
-
 type recommendationParameters struct {
 	Seeds           spotify.Seeds
 	TrackAttributes *spotify.TrackAttributes
@@ -39,12 +25,14 @@ TODO - add limit as parameter (short, medium, long)
 func recommendFromHistory(client *spotify.Client) ([]spotify.FullTrack, error) {
 	recommendedTracks := []spotify.FullTrack{}
 	recentTracksIDs := []spotify.ID{}
+	// TODO - user ID is stored in session so save an external call
 	user, err := client.CurrentUser()
 	if err != nil {
 		log.Panic(err)
 	}
+	//  get latest [pageLimit] tracks from firestore
 	path := fmt.Sprintf("users/%s/recently_played", string(user.ID))
-	iter := firestoreClient.Collection(path).OrderBy("played_at", firestore.Desc).Limit(24).Documents(ctx)
+	iter := firestoreClient.Collection(path).OrderBy("played_at", firestore.Desc).Limit(pageLimit).Documents(ctx)
 	var tr firestoreTrack
 	// fiil in recentTracksIDs
 	defer iter.Stop()
@@ -74,7 +62,7 @@ func recommendFromHistory(client *spotify.Client) ([]spotify.FullTrack, error) {
 	if err != nil {
 		return recommendedTracks, err
 	}
-	// modern tracks not oldies, seed by recent 5 tracks and average attributes of retrieved tracks (24)
+	// modern tracks not oldies, seed by recent 5 tracks and average attributes of retrieved tracks (pageLimit)
 	params := recommendationParameters{
 		FromYear:      1999,
 		MinTrackCount: 20,
@@ -83,40 +71,45 @@ func recommendFromHistory(client *spotify.Client) ([]spotify.FullTrack, error) {
 		},
 		TrackAttributes: trackAttributes,
 	}
-
+	// get recommendations
 	pageTracks, err := getRecommendedTracks(client, params)
 	if err != nil {
 		return recommendedTracks, err
 	}
+	// save on this call we do not loop
 	recommendedTracks = append(recommendedTracks, pageTracks...)
 
 	return recommendedTracks, nil
 }
 
 /* recommendFromMood - suggest new music based on recently playing tracks
-5 recent tracks and averaged attibutes of of recent tracks
+5 recent tracks and averaged attibutes of of recent tracks.
+It works well.
+TODO - add parametrization
 */
 func recommendFromMood(client *spotify.Client) ([]spotify.FullTrack, error) {
 	recommendedTracks := []spotify.FullTrack{}
 	recentTracksIDs := []spotify.ID{}
-
+	// get recently played tracks
 	recentlyPlayed, err := client.PlayerRecentlyPlayed()
 	if err != nil {
 		return recommendedTracks, fmt.Errorf("Failed to get user's recently played: %v", err)
 	}
-
+	// but only unique no hiccups
 	for _, item := range recentlyPlayed {
 		recentTracksIDs = appendIfUnique(recentTracksIDs, item.Track.ID)
 	}
-	recentTracks, errF := fullTrackGetMany(client, recentTracksIDs)
-	if errF != nil {
-		return recommendedTracks, errF
+	// get full tracks
+	recentTracks, err := fullTrackGetMany(client, recentTracksIDs)
+	if err != nil {
+		return recommendedTracks, err
 	}
-	trackAttributes, errA := getTrackAttributes(client, recentTracks)
-	if errA != nil {
-		return recommendedTracks, errA
+	// get averaged attributes
+	trackAttributes, err := getTrackAttributes(client, recentTracks)
+	if err != nil {
+		return recommendedTracks, err
 	}
-
+	// seed with recent five tracks and attributes of recently played
 	params := recommendationParameters{
 		FromYear:      1999,
 		MinTrackCount: 20,
@@ -125,12 +118,12 @@ func recommendFromMood(client *spotify.Client) ([]spotify.FullTrack, error) {
 		},
 		TrackAttributes: trackAttributes,
 	}
-
+	// get recommendation
 	pageTracks, err := getRecommendedTracks(client, params)
 	if err != nil {
 		return recommendedTracks, err
 	}
-
+	// This is not necessary as we are not looping
 	recommendedTracks = append(recommendedTracks, pageTracks...)
 
 	return recommendedTracks, nil
@@ -138,25 +131,28 @@ func recommendFromMood(client *spotify.Client) ([]spotify.FullTrack, error) {
 
 /* recommendFromTop - recommend music based on your top artists and
 averaged attributes of user's top tracks
+TODO - this doesn't make sense like getting country tracks for Miles Davis
 */
 func recommendFromTop(client *spotify.Client) ([]spotify.FullTrack, error) {
 	tracks := []spotify.FullTrack{}
 	limit := 5
+	// Get top five artists
 	userTopArtists, err := client.CurrentUsersTopArtistsOpt(&spotify.Options{Limit: &limit})
 	if err != nil {
 		return tracks, fmt.Errorf("Failed to get user's top artists: %v", err)
 	}
-
+	// get top tracks
 	userTopTracks, err := client.CurrentUsersTopTracks()
 	if err != nil {
 		return tracks, fmt.Errorf("Failed to get user's top tracks: %v", err)
 	}
-
+	// get averaged attributes (audio features) for top tracks
 	trackAttributes, err := getTrackAttributes(client, userTopTracks.Tracks)
 	if err != nil {
 		return tracks, err
 	}
-
+	// Loop over top artists and get recommendations
+	// This doesn't make any sense to me with diverse tastes
 	for _, artist := range userTopArtists.Artists {
 		log.Printf("Fetching recommendations seeded by artist %s", artist.Name)
 
@@ -182,6 +178,10 @@ func recommendFromTop(client *spotify.Client) ([]spotify.FullTrack, error) {
 	return tracks, nil
 }
 
+/* miniAudioFeatures - quickly implemented function to feed charts
+gets selected audio features for songs, normalizes them (TODO - think through)
+and packs and returns
+*/
 func miniAudioFeatures(ids []spotify.ID, client *spotify.Client) *[]audioTrack {
 	var f audioTrack
 	var audioTracks []audioTrack
