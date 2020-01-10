@@ -1,26 +1,20 @@
 ---
 runtime: go113
 env: standard
-instance_class: F1
-automatic_scaling:
-  target_cpu_utilization: 0.85
-  min_instances: 1
-  max_instances: 3
-  min_pending_latency: 30ms  # default value
-  max_pending_latency: automatic
-  max_concurrent_requests: 50
 
-# basic_scaling:
+# instance_class: F1
+# automatic_scaling:
+#   target_cpu_utilization: 0.85
+#   min_instances: 1
 #   max_instances: 3
-# Trick #1
-# manual_scaling:
-#   instances: 1
+#   min_pending_latency: 30ms  # default value
+#   max_pending_latency: automatic
+#   max_concurrent_requests: 50
 
-# Trick #2 - downgrade default resources
-resources:
-  # cpu: 1
-  # memory_gb: 0.6
-  # disk_size_gb: 10
+instance_class: B2
+basic_scaling:
+  max_instances: 3
+
 # Trick #3
 # gcloud app deploy --version dev
 # when done testing SWITCH OFF

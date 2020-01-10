@@ -19,6 +19,14 @@ type firestoreToken struct {
 	token *oauth2.Token // Spotify token
 }
 
+/*TODO
+The big unknown is what happens when user deauthorizes our app in preferences
+without letting us know
+Token becomes invalid and throws at us errors at each attempt (this is a problem for
+Cloud functions which will still attempt to authorize
+- We should also get user country and location
+*/
+
 /*AuthenticationRequired - is an authentication middleware for selected paths
 authPath ("/user" by default) is used for gin router group authorized
 */
@@ -41,9 +49,9 @@ func AuthenticationRequired(authPath string) gin.HandlerFunc {
 		// combination actually exists if necessary. Try adding caching this
 		// since this middleware might be called a lot
 
-		// if user is set in session path and uuid should be (casting to string will fail terribly if nil)
+		// if user is set in session authPath and uuid should be (casting to string will fail terribly if nil)
 		userString := user.(string)
-		if path := session.Get("path").(string); path == authPath {
+		if path := session.Get("authPath").(string); path == authPath {
 			log.Printf("/auth: Seems like we are legit as user %s for routes group %s: ", userString, authPath)
 		}
 		uuid := session.Get("uuid").(string)
@@ -61,11 +69,11 @@ func AuthenticationRequired(authPath string) gin.HandlerFunc {
 			newTok.path = authPath
 			tok, _ := getTokenFromDB(&newTok)
 			log.Printf("/auth: Token expires at: %s", tok.Expiry.In(location).Format("15:04:03"))
-			client := auth.NewClient(tok)
-			kaszka.Set(uuid, &client, cache.DefaultExpiration)
+			spotifyClient := auth.NewClient(tok)
+			kaszka.Set(uuid, &spotifyClient, cache.DefaultExpiration)
 			// if token in Firestore is close to or past expiration we refresh token and update in database
 			if m, _ := time.ParseDuration("4m30s"); time.Until(tok.Expiry) < m {
-				newTok.token, _ = client.Token()
+				newTok.token, _ = spotifyClient.Token()
 				log.Printf("New token expires in: %s", newTok.token.Expiry.Sub(time.Now()).String())
 				updateTokenInDB(&newTok)
 			}
@@ -88,7 +96,7 @@ func clientMagic(c *gin.Context) *spotify.Client {
 	uuid := session.Get("uuid").(string)
 	userString := session.Get("user").(string)
 	authPath := session.Get("authPath").(string)
-	log.Printf("session id: %s", uuid)
+	log.Printf("/clientMagic: session id: %s", uuid)
 	// If the session is running Spotify client is probably cached
 	if gClient, foundClient := kaszka.Get(uuid); foundClient {
 		log.Printf("%s: Cached client found for: %s", endpoint, uuid)

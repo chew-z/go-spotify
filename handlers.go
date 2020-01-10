@@ -96,12 +96,12 @@ func callback(c *gin.Context) {
 	}
 	uuid := guuid.New().String()
 	go func() {
-		client := auth.NewClient(tok)
+		spotifyClient := auth.NewClient(tok)
 		log.Println("/callback: Login Completed!")
 		// This is just a trick for passing client further (to /login endpoint) to get and save Spotify userID
-		kaszka.Set(uuid, &client, cache.DefaultExpiration)
+		kaszka.Set(uuid, &spotifyClient, cache.DefaultExpiration)
 		log.Printf("/callback: Cached client for: %s", endpoint)
-		clientChannel <- &client
+		clientChannel <- &spotifyClient
 	}()
 	url := fmt.Sprintf("http://%s%s?endpoint=%s&id=%s", c.Request.Host, "/login", endpoint, uuid)
 	defer func() {
@@ -128,14 +128,14 @@ func login(c *gin.Context) {
 	if gclient, foundClient := kaszka.Get(uuid); foundClient {
 		log.Printf("/login: Cached client found for: %s", uuid)
 		// get Spotify client
-		client := gclient.(*spotify.Client)
+		spotifyClient := gclient.(*spotify.Client)
 		// and get Spotify user (user.ID)
-		user, err := client.CurrentUser()
+		user, err := spotifyClient.CurrentUser()
 		if err != nil {
 			log.Panic(err)
 		}
 		// get token for client
-		newToken, _ := client.Token()
+		newToken, _ := spotifyClient.Token()
 		log.Println(newToken.Expiry.Sub(time.Now()))
 		// path := fmt.Sprintf("users/%s/tokens%s", string(user.ID), endpoint)
 		// save token to Firestore
@@ -179,10 +179,10 @@ func logout(c *gin.Context) {
 read zmb3/spotify code to learn more
 */
 func top(c *gin.Context) {
-	client := clientMagic(c)
-	if client != nil {
+	spotifyClient := clientMagic(c)
+	if spotifyClient != nil {
 		// use the client to make calls that require authorization
-		top, err := client.CurrentUsersTopTracks()
+		top, err := spotifyClient.CurrentUsersTopTracks()
 		if err != nil {
 			log.Panic(err)
 			c.String(http.StatusNotFound, err.Error())
@@ -218,12 +218,12 @@ I see three different ways of doing it:
 3) with single loop and multiple calls to Spotify API - GetTrack(id ID)
 */
 func popular(c *gin.Context) {
-	client := clientMagic(c)
-	if client != nil {
+	spotifyClient := clientMagic(c)
+	if spotifyClient != nil {
 		session := sessions.Default(c)
 		user := session.Get("user")
 		if user == nil {
-			u, err := client.CurrentUser()
+			u, err := spotifyClient.CurrentUser()
 			if err != nil {
 				log.Panic(err)
 			}
@@ -249,7 +249,7 @@ func popular(c *gin.Context) {
 			}
 			toplist = append(toplist, pt.Count)
 		}
-		topTracks, err := fullTrackGetMany(client, trackIDs)
+		topTracks, err := fullTrackGetMany(spotifyClient, trackIDs)
 		if err != nil {
 			log.Println(err.Error())
 		}
@@ -284,8 +284,8 @@ func analysis(c *gin.Context) {
 	}
 	log.Printf("Cookie values: %s \n", analysisCookie)
 
-	client := clientMagic(c)
-	if client == nil {
+	spotifyClient := clientMagic(c)
+	if spotifyClient == nil {
 		c.JSON(http.StatusTeapot, gin.H{"/analysis": "failed to find  client"})
 		return
 	}
@@ -294,7 +294,7 @@ func analysis(c *gin.Context) {
 		session := sessions.Default(c)
 		user := session.Get("user")
 		if user == nil {
-			u, err := client.CurrentUser()
+			u, err := spotifyClient.CurrentUser()
 			if err != nil {
 				log.Panic(err)
 			}
@@ -321,7 +321,7 @@ func analysis(c *gin.Context) {
 			trackID := spotify.ID(doc.Ref.ID)
 			trackIDs = append(trackIDs, trackID)
 		}
-		data := miniAudioFeatures(trackIDs, client)
+		data := miniAudioFeatures(trackIDs, spotifyClient)
 		c.HTML(
 			http.StatusOK,
 			"chart.html",
@@ -336,8 +336,8 @@ func analysis(c *gin.Context) {
 /* history - read saved tracks from Cloud Firestore database
  */
 func history(c *gin.Context) {
-	client := clientMagic(c)
-	if client == nil {
+	spotifyClient := clientMagic(c)
+	if spotifyClient == nil {
 		c.JSON(http.StatusTeapot, gin.H{"/history": "failed to find  client"})
 		return
 	}
@@ -346,7 +346,7 @@ func history(c *gin.Context) {
 		session := sessions.Default(c)
 		user := session.Get("user")
 		if user == nil {
-			u, err := client.CurrentUser()
+			u, err := spotifyClient.CurrentUser()
 			if err != nil {
 				log.Panic(err)
 			}
@@ -399,9 +399,9 @@ func moodFromHistory(c *gin.Context) {
 		c.SetCookie("playlist_ID", c.DefaultQuery("p", defaultMoodPlaylistID), cookieLifetime, endpoint, "", false, true)
 	}
 	log.Printf("Cookie values: %s %s \n", replaceCookie, playlistCookie)
-	client := clientMagic(c)
-	if client != nil {
-		spotTracks, err := recommendFromHistory(client)
+	spotifyClient := clientMagic(c)
+	if spotifyClient != nil {
+		spotTracks, err := recommendFromHistory(spotifyClient, c)
 		if err != nil {
 			log.Println(err.Error())
 			c.String(http.StatusNotFound, err.Error())
@@ -410,7 +410,7 @@ func moodFromHistory(c *gin.Context) {
 			playlist := c.DefaultQuery("p", playlistCookie)
 			recommendedPlaylistID := spotify.ID(playlist)
 			chunks := chunkIDs(getSpotifyIDs(spotTracks), pageLimit)
-			err = client.ReplacePlaylistTracks(recommendedPlaylistID, chunks[0]...)
+			err = spotifyClient.ReplacePlaylistTracks(recommendedPlaylistID, chunks[0]...)
 			if err == nil {
 				log.Println("Tracks added")
 			} else {
@@ -443,10 +443,10 @@ func moodFromHistory(c *gin.Context) {
 /* user - displays user identity (display name)
  */
 func user(c *gin.Context) {
-	client := clientMagic(c)
-	if client != nil {
+	spotifyClient := clientMagic(c)
+	if spotifyClient != nil {
 		// use the client to make calls that require authorization
-		user, err := client.CurrentUser()
+		user, err := spotifyClient.CurrentUser()
 		if err != nil {
 			log.Panic(err)
 		}
@@ -467,15 +467,15 @@ func user(c *gin.Context) {
 /* tracks - display some of user's tracks
  */
 func tracks(c *gin.Context) {
-	client := clientMagic(c)
-	if client == nil {
+	spotifyClient := clientMagic(c)
+	if spotifyClient == nil {
 		c.JSON(http.StatusTeapot, gin.H{"message": "failed to find  client"})
 		return
 	}
 
 	defer func() {
 		// use the client to make calls that require authorization
-		userTracks, err := client.CurrentUsersTracks()
+		userTracks, err := spotifyClient.CurrentUsersTracks()
 		if err != nil {
 			log.Panic(err)
 			c.String(http.StatusNotFound, err.Error())
@@ -505,15 +505,15 @@ func tracks(c *gin.Context) {
 /* playlists - display some of user's playlists
  */
 func playlists(c *gin.Context) {
-	client := clientMagic(c)
-	if client == nil {
+	spotifyClient := clientMagic(c)
+	if spotifyClient == nil {
 		c.JSON(http.StatusTeapot, gin.H{"message": "failed to find  client"})
 		return
 	}
 
 	defer func() {
 		// use the client to make calls that require authorization
-		playlists, err := client.CurrentUsersPlaylists()
+		playlists, err := spotifyClient.CurrentUsersPlaylists()
 		if err != nil {
 			log.Panic(err)
 			c.String(http.StatusNotFound, err.Error())
@@ -549,15 +549,15 @@ func playlists(c *gin.Context) {
 /* albums - display some of user's albums
  */
 func albums(c *gin.Context) {
-	client := clientMagic(c)
-	if client == nil {
+	spotifyClient := clientMagic(c)
+	if spotifyClient == nil {
 		c.JSON(http.StatusTeapot, gin.H{"message": "failed to find  client"})
 		return
 	}
 
 	defer func() {
 		// use the client to make calls that require authorization
-		userAlbums, err := client.CurrentUsersAlbums()
+		userAlbums, err := spotifyClient.CurrentUsersAlbums()
 		if err != nil {
 			log.Panic(err)
 			c.String(http.StatusNotFound, err.Error())
@@ -593,15 +593,15 @@ func albums(c *gin.Context) {
 /* artists - displays user followed artists
  */
 func artists(c *gin.Context) {
-	client := clientMagic(c)
-	if client == nil {
+	spotifyClient := clientMagic(c)
+	if spotifyClient == nil {
 		c.JSON(http.StatusTeapot, gin.H{"message": "failed to find  client"})
 		return
 	}
 
 	defer func() {
 		// use the client to make calls that require authorization
-		artists, err := client.CurrentUsersFollowedArtists()
+		artists, err := spotifyClient.CurrentUsersFollowedArtists()
 		if err != nil {
 			log.Panic(err)
 			c.String(http.StatusNotFound, err.Error())

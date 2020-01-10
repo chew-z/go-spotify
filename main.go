@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"net/http"
+	"os"
 
 	"cloud.google.com/go/firestore"
 	"github.com/gin-gonic/contrib/sessions"
@@ -18,6 +19,7 @@ like 403 lack of scope, unexpected endpoint etc.
 var (
 	firestoreClient *firestore.Client
 	ctx             = context.Background()
+	sessionSecret   = os.Getenv("SESSION_SECRET")
 )
 
 func main() {
@@ -28,8 +30,8 @@ func init() {
 	firestoreClient = initFirestoreDatabase(ctx)
 
 	router := gin.Default()
-	store := sessions.NewCookieStore([]byte("sessionSuperSecret"))
-	router.Use(sessions.Sessions("sessionName", store))
+	store := sessions.NewCookieStore([]byte(sessionSecret))
+	router.Use(sessions.Sessions("go-spotify", store))
 
 	router.Static("/static", "./static")
 	router.StaticFile("/favicon.ico", "./favicon.ico")

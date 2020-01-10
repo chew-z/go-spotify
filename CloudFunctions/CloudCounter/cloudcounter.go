@@ -62,46 +62,33 @@ func init() {
 	ctx := context.Background()
 	app, err := firebase.NewApp(ctx, conf)
 	if err != nil {
-		log.Fatalf("firebase.NewApp: %v", err)
+		log.Panicf("firebase.NewApp: %v", err)
 	}
 
 	firestoreClient, err = app.Firestore(ctx)
 	if err != nil {
-		log.Fatalf("app.Firestore: %v", err)
+		log.Panicf("app.Firestore: %v", err)
 	}
 }
 
 // CloudCounter is triggered by a change to a Firestore document.
 func CloudCounter(ctx context.Context, e FirestoreEvent) error {
-	// meta, err := metadata.FromContext(ctx)
-	// if err != nil {
-	// 	return fmt.Errorf("metadata.FromContext: %v", err)
-	// }
-
-	// log.Printf("Function triggered by change to: %v", meta.Resource)
-	// log.Printf("Old value: %+v", e.OldValue)
-	// log.Printf("New value: %+v", e.Value)
-
 	fullPath := strings.Split(e.Value.Name, "/documents/")[1]
-	// log.Println(fullPath)
 	pathParts := strings.Split(fullPath, "/")
-	// collection := pathParts[0]
-	userID := pathParts[1] // aka track.ID
-	docID := pathParts[3]  // aka track.ID
-	log.Printf("userID and docID: %s %s", userID, docID)
+	userID := pathParts[1]
+	docID := pathParts[3]
+	// log.Printf("userID and docID: %s %s", userID, docID)
 	// In order to avoid triggering infinite loop we keep counters in separate collection
 	path := fmt.Sprintf("users/%s/popular_tracks", userID)
-	log.Println(path)
+	// log.Println(path)
 	docRef := firestoreClient.Collection(path).Doc(docID)
 	_, err := docRef.Set(ctx, map[string]interface{}{
 		"count": firestore.Increment(1)}, firestore.MergeAll)
-	// 	// https://cloud.google.com/functions/docs/calling/cloud-firestore#specifying_the_document_path
-	// 	// Functions only respond to document changes, and cannot monitor specific fields or collections.
-	// 	// So this creates infinite loop updating "count" forever
-	// })
+	// https://cloud.google.com/functions/docs/calling/cloud-firestore#specifying_the_document_path
+	// Functions only respond to document changes, and cannot monitor specific fields or collections.
 	if err != nil {
 		log.Println(err.Error())
-		return fmt.Errorf("beancounter: %v", err)
+		return fmt.Errorf("CloudCounter: %v", err)
 	}
 	// log.Println(w.UpdateTime)
 	return nil

@@ -7,6 +7,8 @@ import (
 	"strings"
 
 	"cloud.google.com/go/firestore"
+	"github.com/gin-gonic/contrib/sessions"
+	"github.com/gin-gonic/gin"
 	"github.com/zmb3/spotify"
 	"google.golang.org/api/iterator"
 )
@@ -22,16 +24,13 @@ type recommendationParameters struct {
 are taken from Firebase store (unique tracks etc.)
 TODO - add limit as parameter (short, medium, long)
 */
-func recommendFromHistory(client *spotify.Client) ([]spotify.FullTrack, error) {
+func recommendFromHistory(spotifyClient *spotify.Client, c *gin.Context) ([]spotify.FullTrack, error) {
 	recommendedTracks := []spotify.FullTrack{}
 	recentTracksIDs := []spotify.ID{}
-	// TODO - user ID is stored in session so save an external call
-	user, err := client.CurrentUser()
-	if err != nil {
-		log.Panic(err)
-	}
+	session := sessions.Default(c)
+	user := session.Get("user").(string)
 	//  get latest [pageLimit] tracks from firestore
-	path := fmt.Sprintf("users/%s/recently_played", string(user.ID))
+	path := fmt.Sprintf("users/%s/recently_played", user)
 	iter := firestoreClient.Collection(path).OrderBy("played_at", firestore.Desc).Limit(pageLimit).Documents(ctx)
 	var tr firestoreTrack
 	// fiil in recentTracksIDs
@@ -53,12 +52,12 @@ func recommendFromHistory(client *spotify.Client) ([]spotify.FullTrack, error) {
 		}
 	}
 	// get full tracks for track IDs
-	recentTracks, err := fullTrackGetMany(client, recentTracksIDs)
+	recentTracks, err := fullTrackGetMany(spotifyClient, recentTracksIDs)
 	if err != nil {
 		return recommendedTracks, err
 	}
 	// get attributes for tracks
-	trackAttributes, err := getTrackAttributes(client, recentTracks)
+	trackAttributes, err := getTrackAttributes(spotifyClient, recentTracks)
 	if err != nil {
 		return recommendedTracks, err
 	}
@@ -72,14 +71,14 @@ func recommendFromHistory(client *spotify.Client) ([]spotify.FullTrack, error) {
 		TrackAttributes: trackAttributes,
 	}
 	// get recommendations
-	pageTracks, err := getRecommendedTracks(client, params)
+	pageTracks, err := getRecommendedTracks(spotifyClient, params)
 	if err != nil {
 		return recommendedTracks, err
 	}
-	// save on this call we do not loop
-	recommendedTracks = append(recommendedTracks, pageTracks...)
+	// TODO save on this call we do not loop
+	// recommendedTracks = append(recommendedTracks, pageTracks...)
 
-	return recommendedTracks, nil
+	return pageTracks, nil
 }
 
 /* recommendFromMood - suggest new music based on recently playing tracks
@@ -87,11 +86,11 @@ func recommendFromHistory(client *spotify.Client) ([]spotify.FullTrack, error) {
 It works well.
 TODO - add parametrization
 */
-func recommendFromMood(client *spotify.Client) ([]spotify.FullTrack, error) {
+func recommendFromMood(spotifyClient *spotify.Client) ([]spotify.FullTrack, error) {
 	recommendedTracks := []spotify.FullTrack{}
 	recentTracksIDs := []spotify.ID{}
 	// get recently played tracks
-	recentlyPlayed, err := client.PlayerRecentlyPlayed()
+	recentlyPlayed, err := spotifyClient.PlayerRecentlyPlayed()
 	if err != nil {
 		return recommendedTracks, fmt.Errorf("Failed to get user's recently played: %v", err)
 	}
@@ -100,12 +99,12 @@ func recommendFromMood(client *spotify.Client) ([]spotify.FullTrack, error) {
 		recentTracksIDs = appendIfUnique(recentTracksIDs, item.Track.ID)
 	}
 	// get full tracks
-	recentTracks, err := fullTrackGetMany(client, recentTracksIDs)
+	recentTracks, err := fullTrackGetMany(spotifyClient, recentTracksIDs)
 	if err != nil {
 		return recommendedTracks, err
 	}
 	// get averaged attributes
-	trackAttributes, err := getTrackAttributes(client, recentTracks)
+	trackAttributes, err := getTrackAttributes(spotifyClient, recentTracks)
 	if err != nil {
 		return recommendedTracks, err
 	}
@@ -119,35 +118,35 @@ func recommendFromMood(client *spotify.Client) ([]spotify.FullTrack, error) {
 		TrackAttributes: trackAttributes,
 	}
 	// get recommendation
-	pageTracks, err := getRecommendedTracks(client, params)
+	pageTracks, err := getRecommendedTracks(spotifyClient, params)
 	if err != nil {
 		return recommendedTracks, err
 	}
-	// This is not necessary as we are not looping
-	recommendedTracks = append(recommendedTracks, pageTracks...)
+	// TODO This is not necessary as we are not looping
+	// recommendedTracks = append(recommendedTracks, pageTracks...)
 
-	return recommendedTracks, nil
+	return pageTracks, nil
 }
 
 /* recommendFromTop - recommend music based on your top artists and
 averaged attributes of user's top tracks
 TODO - this doesn't make sense like getting country tracks for Miles Davis
 */
-func recommendFromTop(client *spotify.Client) ([]spotify.FullTrack, error) {
+func recommendFromTop(spotifyClient *spotify.Client) ([]spotify.FullTrack, error) {
 	tracks := []spotify.FullTrack{}
 	limit := 5
 	// Get top five artists
-	userTopArtists, err := client.CurrentUsersTopArtistsOpt(&spotify.Options{Limit: &limit})
+	userTopArtists, err := spotifyClient.CurrentUsersTopArtistsOpt(&spotify.Options{Limit: &limit})
 	if err != nil {
 		return tracks, fmt.Errorf("Failed to get user's top artists: %v", err)
 	}
 	// get top tracks
-	userTopTracks, err := client.CurrentUsersTopTracks()
+	userTopTracks, err := spotifyClient.CurrentUsersTopTracks()
 	if err != nil {
 		return tracks, fmt.Errorf("Failed to get user's top tracks: %v", err)
 	}
 	// get averaged attributes (audio features) for top tracks
-	trackAttributes, err := getTrackAttributes(client, userTopTracks.Tracks)
+	trackAttributes, err := getTrackAttributes(spotifyClient, userTopTracks.Tracks)
 	if err != nil {
 		return tracks, err
 	}
@@ -165,7 +164,7 @@ func recommendFromTop(client *spotify.Client) ([]spotify.FullTrack, error) {
 			TrackAttributes: trackAttributes,
 		}
 
-		pageTracks, err := getRecommendedTracks(client, params)
+		pageTracks, err := getRecommendedTracks(spotifyClient, params)
 		if err != nil {
 			return tracks, err
 		}
@@ -182,12 +181,12 @@ func recommendFromTop(client *spotify.Client) ([]spotify.FullTrack, error) {
 gets selected audio features for songs, normalizes them (TODO - think through)
 and packs and returns
 */
-func miniAudioFeatures(ids []spotify.ID, client *spotify.Client) *[]audioTrack {
+func miniAudioFeatures(ids []spotify.ID, spotifyClient *spotify.Client) *[]audioTrack {
 	var f audioTrack
 	var audioTracks []audioTrack
 	chunks := chunkIDs(ids, pageLimit)
-	audioFeatures, _ := client.GetAudioFeatures(chunks[0]...) // GetAudioFeatures has variadic argument
-	fullTracks, _ := fullTrackGetMany(client, chunks[0])
+	audioFeatures, _ := spotifyClient.GetAudioFeatures(chunks[0]...) // GetAudioFeatures has variadic argument
+	fullTracks, _ := fullTrackGetMany(spotifyClient, chunks[0])
 	for i, res := range audioFeatures {
 		if res.ID != fullTracks[i].ID {
 			log.Println("miniAudioFeatures: NOT IN SYNC")
@@ -209,10 +208,10 @@ func miniAudioFeatures(ids []spotify.ID, client *spotify.Client) *[]audioTrack {
 
 /* getTrackAttributes - return averaged attributes for set of tracks
  */
-func getTrackAttributes(client *spotify.Client, tracks []spotify.FullTrack) (*spotify.TrackAttributes, error) {
+func getTrackAttributes(spotifyClient *spotify.Client, tracks []spotify.FullTrack) (*spotify.TrackAttributes, error) {
 	var attributes *spotify.TrackAttributes
 
-	features, err := client.GetAudioFeatures(getSpotifyIDs(tracks)...)
+	features, err := spotifyClient.GetAudioFeatures(getSpotifyIDs(tracks)...)
 	if err != nil {
 		return attributes, fmt.Errorf(
 			"Failed to get audio features of %d track(s): %v",

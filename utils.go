@@ -29,7 +29,7 @@ func initFirestoreDatabase(ctx context.Context) *firestore.Client {
 
 /*getRecommendedTracks - gets recommendation based on seed
  */
-func getRecommendedTracks(client *spotify.Client, params recommendationParameters) ([]spotify.FullTrack, error) {
+func getRecommendedTracks(spotifyClient *spotify.Client, params recommendationParameters) ([]spotify.FullTrack, error) {
 	limit := pageLimit
 	tracks := []spotify.FullTrack{}
 	options := spotify.Options{
@@ -37,32 +37,33 @@ func getRecommendedTracks(client *spotify.Client, params recommendationParameter
 		Country: &countryPoland, // TODO - this and location
 	}
 	// get recommendtions (only single page)
-	page, err := client.GetRecommendations(params.Seeds, params.TrackAttributes, &options)
+	page, err := spotifyClient.GetRecommendations(params.Seeds, params.TrackAttributes, &options)
 	if err != nil {
 		return tracks, fmt.Errorf("Failed to get recommendations: %v", err)
 	}
 	// TODO - we might skip both logic before to speed up
 	// all this is only necessary to limit release date
-	fullTracks, err := fullTrackGetMany(client, getSpotifyIDs(page.Tracks))
+	fullTracks, err := fullTrackGetMany(spotifyClient, getSpotifyIDs(page.Tracks))
 	if err != nil {
 		return tracks, err
 	}
-	for _, track := range fullTracks {
-		album, err := fullAlbumGet(client, track.Album.ID)
-		if err != nil {
-			return tracks, err
-		}
-		if album.ReleaseDateTime().Year() >= params.FromYear {
-			tracks = append(tracks, track)
-		}
-	}
-	return tracks, nil
+	// for _, track := range fullTracks {
+	// 	album, err := fullAlbumGet(client, track.Album.ID)
+	// 	if err != nil {
+	// 		return tracks, err
+	// 	}
+	// 	if album.ReleaseDateTime().Year() >= params.FromYear {
+	// 		tracks = append(tracks, track)
+	// 	}
+	// }
+	// return tracks, nil
+	return fullTracks, nil
 }
 
 /*fullTracksGetMany - gets FullTrack objects for given track IDs
 This is used a lot and pehaps could be speed up
 */
-func fullTrackGetMany(client *spotify.Client, ids []spotify.ID) ([]spotify.FullTrack, error) {
+func fullTrackGetMany(spotifyClient *spotify.Client, ids []spotify.ID) ([]spotify.FullTrack, error) {
 	tracks := []spotify.FullTrack{}
 
 	if len(ids) == 0 {
@@ -72,7 +73,7 @@ func fullTrackGetMany(client *spotify.Client, ids []spotify.ID) ([]spotify.FullT
 	// TODO we are using single chunk for now
 	chunks := chunkIDs(ids, pageLimit)
 	for _, chunkIDs := range chunks {
-		pointerTracks, err := client.GetTracks(chunkIDs...)
+		pointerTracks, err := spotifyClient.GetTracks(chunkIDs...)
 		if err != nil {
 			return tracks, fmt.Errorf("Failed to get many tracks: %v", err)
 		}
@@ -83,12 +84,12 @@ func fullTrackGetMany(client *spotify.Client, ids []spotify.ID) ([]spotify.FullT
 	return tracks, nil
 }
 
-func fullAlbumGet(client *spotify.Client, id spotify.ID) (spotify.FullAlbum, error) {
+func fullAlbumGet(spotifyClient *spotify.Client, id spotify.ID) (spotify.FullAlbum, error) {
 	// var albumCache = map[spotify.ID]spotify.FullAlbum{}
 	// if album, exists := albumCache[id]; exists {
 	// 	return album, nil
 	// }
-	album, err := client.GetAlbum(id)
+	album, err := spotifyClient.GetAlbum(id)
 	if err != nil {
 		return spotify.FullAlbum{}, fmt.Errorf("Failed to get full album %s: %v", id, err)
 	}
