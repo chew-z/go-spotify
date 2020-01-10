@@ -29,10 +29,11 @@ func recommendFromHistory(spotifyClient *spotify.Client, c *gin.Context) ([]spot
 	recentTracksIDs := []spotify.ID{}
 	session := sessions.Default(c)
 	user := session.Get("user").(string)
+	country := session.Get("country").(string)
 	//  get latest [pageLimit] tracks from firestore
 	path := fmt.Sprintf("users/%s/recently_played", user)
 	iter := firestoreClient.Collection(path).OrderBy("played_at", firestore.Desc).Limit(pageLimit).Documents(ctx)
-	var tr firestoreTrack
+	// var tr firestoreTrack
 	// fiil in recentTracksIDs
 	defer iter.Stop()
 	for {
@@ -45,11 +46,11 @@ func recommendFromHistory(spotifyClient *spotify.Client, c *gin.Context) ([]spot
 			log.Println(err.Error())
 			return recommendedTracks, err
 		}
-		recentTracksIDs = append(recentTracksIDs, spotify.ID(doc.Ref.ID))
-		if err := doc.DataTo(&tr); err != nil {
-			log.Println(err.Error())
-			return recommendedTracks, err
-		}
+		recentTracksIDs = append(recentTracksIDs, spotify.ID(doc.Ref.ID)) // TODO == *tr.ID
+		// if err := doc.DataTo(&tr); err != nil {
+		// 	log.Println(err.Error())
+		// 	return recommendedTracks, err
+		// }
 	}
 	// get full tracks for track IDs
 	recentTracks, err := fullTrackGetMany(spotifyClient, recentTracksIDs)
@@ -71,7 +72,7 @@ func recommendFromHistory(spotifyClient *spotify.Client, c *gin.Context) ([]spot
 		TrackAttributes: trackAttributes,
 	}
 	// get recommendations
-	pageTracks, err := getRecommendedTracks(spotifyClient, params)
+	pageTracks, err := getRecommendedTracks(spotifyClient, params, &country)
 	if err != nil {
 		return recommendedTracks, err
 	}
@@ -101,7 +102,7 @@ func recommendFromMood(spotifyClient *spotify.Client) ([]spotify.FullTrack, erro
 	// get full tracks
 	recentTracks, err := fullTrackGetMany(spotifyClient, recentTracksIDs)
 	if err != nil {
-		return recommendedTracks, err
+		return recommendedTracks, fmt.Errorf("Failed to full tracks: %v", err)
 	}
 	// get averaged attributes
 	trackAttributes, err := getTrackAttributes(spotifyClient, recentTracks)
@@ -117,10 +118,15 @@ func recommendFromMood(spotifyClient *spotify.Client) ([]spotify.FullTrack, erro
 		},
 		TrackAttributes: trackAttributes,
 	}
-	// get recommendation
-	pageTracks, err := getRecommendedTracks(spotifyClient, params)
+	user, err := spotifyClient.CurrentUser() //TODO - all this isn't necessary
 	if err != nil {
-		return recommendedTracks, err
+		return recommendedTracks, fmt.Errorf("Failed to get user: %v", err)
+	}
+	country := string(user.Country)
+	// get recommendation
+	pageTracks, err := getRecommendedTracks(spotifyClient, params, &country)
+	if err != nil {
+		return recommendedTracks, fmt.Errorf("Failed to get recommended tracks: %v", err)
 	}
 	// TODO This is not necessary as we are not looping
 	// recommendedTracks = append(recommendedTracks, pageTracks...)
@@ -150,6 +156,11 @@ func recommendFromTop(spotifyClient *spotify.Client) ([]spotify.FullTrack, error
 	if err != nil {
 		return tracks, err
 	}
+	user, err := spotifyClient.CurrentUser() //TODO - all this isn't necessary
+	if err != nil {
+		return tracks, fmt.Errorf("Failed to get user: %v", err)
+	}
+	country := string(user.Country)
 	// Loop over top artists and get recommendations
 	// This doesn't make any sense to me with diverse tastes
 	for _, artist := range userTopArtists.Artists {
@@ -163,8 +174,7 @@ func recommendFromTop(spotifyClient *spotify.Client) ([]spotify.FullTrack, error
 			},
 			TrackAttributes: trackAttributes,
 		}
-
-		pageTracks, err := getRecommendedTracks(spotifyClient, params)
+		pageTracks, err := getRecommendedTracks(spotifyClient, params, &country)
 		if err != nil {
 			return tracks, err
 		}

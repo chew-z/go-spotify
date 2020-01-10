@@ -5,6 +5,7 @@ deploy.sh
 bin/**
 CloudFunctions/**
 token.json
+init.sh
 *.bak
 *.bak.go
 spotify.txt

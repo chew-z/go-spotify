@@ -2,6 +2,7 @@ token.json
 .firebase-credentials.json
 *.json
 deploy.sh
+init.sh
 favicon.png
 bin/**
 CloudFunctions/.env.yaml

@@ -14,9 +14,11 @@ import (
 )
 
 type firestoreToken struct {
-	user  string        // Spotify user ID
-	path  string        // authorization path (gin routes group)
-	token *oauth2.Token // Spotify token
+	user     string        // Spotify user ID
+	country  string        // The country of the user, as set in the user's account profile
+	timezone string        // TODO let user set timezone
+	path     string        // authorization path (gin routes group)
+	token    *oauth2.Token // Spotify token
 }
 
 /*TODO
@@ -55,14 +57,13 @@ func AuthenticationRequired(authPath string) gin.HandlerFunc {
 			log.Printf("/auth: Seems like we are legit as user %s for routes group %s: ", userString, authPath)
 		}
 		uuid := session.Get("uuid").(string)
-
 		// var client *spotify.Client
 		// We are only checking if there is a client for this session in cache
 		if _, foundClient := kaszka.Get(uuid); foundClient {
-			log.Printf("/auth: Cached client found for: %s", uuid)
 			// client = gclient.(*spotify.Client)
 			// kaszka.Add(uuid, &client, cache.DefaultExpiration) //Add is like Set or refresh
 		} else { // and if there is no client in cache we get token from Firestore
+			log.Printf("/auth: Cached client NOT found for: %s", uuid)
 			// create client and put it in cache
 			var newTok firestoreToken
 			newTok.user = userString
@@ -145,7 +146,9 @@ func saveTokenToDB(token *firestoreToken) {
 	// TODO - two set operations - ?
 	_, err := firestoreClient.Doc(path).Set(ctx, token.token)
 	_, err = firestoreClient.Collection("users").Doc(token.user).Set(ctx, map[string]interface{}{
-		"userID": token.user,
+		"userID":   token.user,
+		"country":  token.country,
+		"timezone": token.timezone,
 	}, firestore.MergeAll)
 	if err != nil {
 		log.Printf("saveToken: Error saving token for %s %s", token.path, err.Error())

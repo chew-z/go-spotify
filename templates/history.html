@@ -12,9 +12,7 @@
     {{range .Tracks }}
     <div class="card">
         <div class="card-body">
-            <p class="card-text">[{{.PlayedAt.Format "15:04:05"}}] 
-            {{with .Name}}<strong>{{.}}</strong>{{end}} 
-            <em>{{.Artists}}</em></p>
+            <p class="card-text">[{{.PlayedAt.Format "15:04:05"}}] <a href="https://open.spotify.com/track/{{ .ID }}">{{.Name}}</a> <em>{{.Artists}}</em></p>
         </div>
     </div>
     {{end}}

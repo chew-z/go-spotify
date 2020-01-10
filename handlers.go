@@ -25,6 +25,7 @@ type firestoreTrack struct {
 	Name     string    `firestore:"track_name"`
 	Artists  string    `firestore:"artists"`
 	PlayedAt time.Time `firestore:"played_at"`
+	ID       string    `firestore:"id,omitempty"`
 }
 
 // TODO - used only once
@@ -65,7 +66,8 @@ const (
 
 var (
 	countryPoland = "PL"
-	location, _   = time.LoadLocation("Europe/Warsaw")
+	timezone      = "Europe/Warsaw"
+	location, _   = time.LoadLocation(timezone)
 	kaszka        = cache.New(20*time.Minute, 3*time.Minute)
 	redirectURI   = os.Getenv("REDIRECT_URI")
 	// Warning token will fail if you are changing scope (even if you narrow it down) so you might end up with bunch
@@ -141,13 +143,19 @@ func login(c *gin.Context) {
 		// save token to Firestore
 		var newTok firestoreToken
 		newTok.user = string(user.ID)
+		newTok.country = string(user.Country)
+		tz, err := getTimeZones(string(user.Country))
+		timezone = tz[0] // TODO - this will work for small countries, for Russia, US let user decide
+		newTok.timezone = timezone
 		newTok.path = endpoint
 		newTok.token = newToken
 		saveTokenToDB(&newTok)
 		// save necessary variables into session
 		session := sessions.Default(c)
-		log.Printf("/login: %s", string(user.ID))
+		log.Printf("/login: %s from %s", string(user.ID), string(user.Country))
 		session.Set("user", string(user.ID))
+		session.Set("country", string(user.Country))
+		session.Set("timezone", timezone)
 		session.Set("authPath", endpoint)
 		session.Set("uuid", uuid)
 		if err := session.Save(); err != nil {
@@ -352,6 +360,8 @@ func history(c *gin.Context) {
 			}
 			user = string(u.ID)
 		}
+		tz := session.Get("timezone").(string)
+		loc, _ := time.LoadLocation(tz)
 		path := fmt.Sprintf("users/%s/recently_played", user)
 		iter := firestoreClient.Collection(path).OrderBy("played_at", firestore.Desc).Limit(pageLimit).Documents(ctx)
 		var tr firestoreTrack
@@ -368,7 +378,7 @@ func history(c *gin.Context) {
 			if err := doc.DataTo(&tr); err != nil {
 				log.Println(err.Error())
 			} else {
-				tr.PlayedAt = tr.PlayedAt.In(location) // move time to location
+				tr.PlayedAt = tr.PlayedAt.In(loc) // adjust displayed time to users's location
 				tracks = append(tracks, tr)
 			}
 		}

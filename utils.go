@@ -12,6 +12,7 @@ import (
 
 	"cloud.google.com/go/firestore"
 	"github.com/zmb3/spotify"
+	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
 )
 
@@ -29,12 +30,12 @@ func initFirestoreDatabase(ctx context.Context) *firestore.Client {
 
 /*getRecommendedTracks - gets recommendation based on seed
  */
-func getRecommendedTracks(spotifyClient *spotify.Client, params recommendationParameters) ([]spotify.FullTrack, error) {
+func getRecommendedTracks(spotifyClient *spotify.Client, params recommendationParameters, country *string) ([]spotify.FullTrack, error) {
 	limit := pageLimit
 	tracks := []spotify.FullTrack{}
 	options := spotify.Options{
 		Limit:   &limit,
-		Country: &countryPoland, // TODO - this and location
+		Country: country, // TODO - this and location
 	}
 	// get recommendtions (only single page)
 	page, err := spotifyClient.GetRecommendations(params.Seeds, params.TrackAttributes, &options)
@@ -156,6 +157,32 @@ func getSpotifyIDs(input interface{}) []spotify.ID {
 	}
 
 	return ids
+}
+
+/*getTimezones - returns timezones for the country
+we keep collection 'timezones' just for that
+*/
+func getTimeZones(country string) ([]string, error) {
+	type timeZone struct {
+		Country  string
+		Timezone string
+	}
+	var tz timeZone
+	var timezones []string
+	iter := firestoreClient.Collection("timezones").Where("Country", "==", country).Documents(ctx)
+	defer iter.Stop()
+	for {
+		doc, err := iter.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
+		doc.DataTo(&tz)
+		timezones = append(timezones, tz.Timezone)
+	}
+	return timezones, nil
 }
 
 func getItemPropertyValue(input interface{}, fieldName string) []interface{} {
