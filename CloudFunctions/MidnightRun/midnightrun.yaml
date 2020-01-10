@@ -1,0 +1,9 @@
+steps:
+- name: 'gcr.io/cloud-builders/gcloud'
+  args: ['functions', 'deploy', 'MidnightRun','--runtime', 'go111', '--region', 'europe-west1', '--trigger-http', '--env-vars-file', '.env.yaml']
+  dir: 'CloudFunctions'
+
+
+  # gcloud functions deploy MidnightRun --runtime go111 --trigger-http --env-vars-file .env.yaml
+
+  # TODO - for mysterious reasons build fails (cannot finish so expires) when --timeut is set

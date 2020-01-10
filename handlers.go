@@ -725,48 +725,6 @@ func recommend(c *gin.Context) {
 	}()
 }
 
-/* midnight - endpoint to clean tracks history from Cloud Firestore database
-NOT USED - we keep tracks history for a time
-TODO - make CloudFunction
-*/
-// func midnight(c *gin.Context) {
-// 	batchSize := 20
-// 	user, err := client.CurrentUser()
-// 	if err != nil {
-// 		log.Panic(err)
-// 	}
-// 	path := fmt.Sprintf("users/%s/recently_played", string(user.ID))
-// 	ref := firestoreClient.Collection(path)
-// 	for {
-// 		// Get a batch of documents
-// 		iter := ref.Limit(batchSize).Documents(ctx)
-// 		numDeleted := 0
-// 		// Iterate through the documents, adding a delete operation for each one to a
-// 		// WriteBatch.
-// 		batch := firestoreClient.Batch()
-// 		for {
-// 			doc, err := iter.Next()
-// 			if err == iterator.Done {
-// 				break
-// 			}
-// 			if err != nil {
-// 				log.Println(err.Error())
-// 			}
-// 			batch.Delete(doc.Ref)
-// 			numDeleted++
-// 		}
-// 		// If there are no documents to delete, the process is over.
-// 		if numDeleted == 0 {
-// 			break
-// 		}
-// 		_, err := batch.Commit(ctx)
-// 		if err != nil {
-// 			log.Println(err.Error())
-// 		}
-// 	}
-// 	c.String(http.StatusOK, "Midnight Run - starring Robert DeNiro")
-// }
-
 /* spot - recommend tracks based on user top artists
 recommeded tracks could replace default mood playlist
 or any other (based on passed parameters)
