@@ -2,15 +2,18 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"math"
+	"net/http"
 	"os"
 	"reflect"
 	"strings"
 	"time"
 
 	"cloud.google.com/go/firestore"
+	"github.com/gin-gonic/gin"
 	"github.com/zmb3/spotify"
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
@@ -26,6 +29,48 @@ func initFirestoreDatabase(ctx context.Context) *firestore.Client {
 		log.Panic(err)
 	}
 	return firestoreClient
+}
+
+/*getJSON fetches the contents of the given URL and decodes it as JSON
+into the given result, which should be a pointer to the expected data.
+*/
+func getJSON(url string, result interface{}) error {
+	resp, err := http.Get(url)
+	if err != nil {
+		return fmt.Errorf("cannot fetch URL %q: %v", url, err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("unexpected http GET status: %s", resp.Status)
+	}
+	err = json.NewDecoder(resp.Body).Decode(result)
+	if err != nil {
+		return fmt.Errorf("cannot decode JSON: %v", err)
+	}
+	return nil
+}
+func getUserLocation(c *gin.Context) *userLocation {
+	type response struct {
+		Time string   `json:"time"`
+		Zone []string `json:"zone"`
+	}
+	var (
+		tzResponse response
+		loc        userLocation
+	)
+	loc.City = strings.Title(c.Request.Header.Get("X-AppEngine-City"))
+	latlon := c.Request.Header.Get("X-AppEngine-CityLatLong")
+	if latlon != "" {
+		ll := strings.Split(latlon, ",")
+		loc.Lat = ll[0]
+		loc.Lon = ll[1]
+	}
+	url := fmt.Sprintf("https://europe-west1-go-spotify-262707.cloudfunctions.net/TimeZones?lat=%s&lon=%s", loc.Lat, loc.Lon)
+	err := getJSON(url, &tzResponse)
+	if err == nil {
+		loc.Tz = tzResponse.Zone[0]
+	}
+	return &loc
 }
 
 /*getRecommendedTracks - gets recommendation based on seed

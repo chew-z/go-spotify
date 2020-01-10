@@ -2,6 +2,13 @@
 
 <!--Embed the header.html template at this location-->
 {{ template "header.html" .}}
-<h4 class="display-4">You are logged in as {{ .User }}.</h4>
+<div class="container-fluid">
+    {{ with .Location }}
+    <h4 class="display-4">You are logged in as <a href="{{ .URL }}">{{ .Name }}</a>.</h4>
+    <p class="lead">Your Spotify account is from <strong>{{ .Country }}</strong></p>
+    <p>And your timezone is probably <mark>{{ .Tz }}</mark></p>
+    {{ if .City }}<p><small>You seem to be browsing from {{ .City }} (<em>{{ printf "%.2f" .Lat }}/{{ printf "%.2f" .Lon }}</em>)</small></p>{{ end }}
+    {{ end }}
+</div>
 <!--Embed the footer.html template at this location-->
 {{ template "footer.html" .}}

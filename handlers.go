@@ -54,6 +54,15 @@ type audioTrack struct {
 	URL              string
 	Image            string
 }
+type userLocation struct {
+	Lat     string
+	Lon     string
+	City    string
+	Country string
+	Tz      string
+	Name    string
+	URL     string
+}
 
 const (
 	maxLists       = 5
@@ -457,17 +466,22 @@ func moodFromHistory(c *gin.Context) {
  */
 func user(c *gin.Context) {
 	spotifyClient := clientMagic(c)
+	Loc := getUserLocation(c)
+	log.Printf("city: %s, lat: %s, lon: %s, timezone: %s", Loc.City, Loc.Lat, Loc.Lon, Loc.Tz)
 	if spotifyClient != nil {
 		// use the client to make calls that require authorization
 		user, err := spotifyClient.CurrentUser()
 		if err != nil {
 			log.Panic(err)
 		}
+		Loc.Country = user.Country
+		Loc.Name = user.DisplayName
+		Loc.URL = user.ExternalURLs["spotify"]
 		c.HTML(
 			http.StatusOK,
 			"user.html",
 			gin.H{
-				"User": user.DisplayName,
+				"Location": Loc,
 			},
 		)
 		return
