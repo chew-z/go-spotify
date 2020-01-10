@@ -171,7 +171,10 @@ func login(c *gin.Context) {
 
 /*logout - simplistic logout
 TODO - hidden - make useful logout flow
-user can always clear cookies or un-authorize app in Spotify setting
+user can always clear cookies or de-authorize app in Spotify setting
+and we cannot clear Spotify cookies, beside it would log user out of web players etc.
+It is however usefull as is - resets user session after deploying new version changing
+session vars, otherwise we have Panic on casting string on nil interface
 */
 func logout(c *gin.Context) {
 	// without clearing Spotify cookie we will be simply re-logged transparently

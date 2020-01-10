@@ -79,7 +79,9 @@ func AuthenticationRequired(authPath string) gin.HandlerFunc {
 				updateTokenInDB(&newTok)
 			}
 		}
-		c.Next()
+		return
+		// c.Next() //TODO - philosophical question - Is c.Next() needed here?
+		// https://github.com/gin-gonic/gin/issues/1169
 	}
 }
 
