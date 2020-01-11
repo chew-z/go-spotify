@@ -23,9 +23,13 @@ type response struct {
 	Zone []string `json:"zone"`
 }
 
-/*TimeZones - All this function does is take a request
-(which comes in as query parameters on the request URL),
-performs a sunrise/sunset lookup, and returns a JSON-encoded response.
+/*TimeZones - a microservice (GCF) that takes
+date, lattitude, longtitude and returns timezone(s)
+and time at the location.
+If date is not set it defaults to current time
+while lat/lon defaults to Warsaw/Europe
+very fast, everything in memory
+returns a JSON-encoded response.
 */
 func TimeZones(w http.ResponseWriter, r *http.Request) {
 	var decoder = schema.NewDecoder()
@@ -39,7 +43,7 @@ func TimeZones(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "Error: %s", err)
 		return
 	}
-	log.Printf("Date %v, Lat %v, Lon %v", req.Date, req.Lat, req.Lon)
+	// log.Printf("Date %v, Lat %v, Lon %v", req.Date, req.Lat, req.Lon)
 	if req.Date.IsZero() {
 		req.Date = time.Now()
 	}
@@ -53,10 +57,9 @@ func TimeZones(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Panic(err)
 	}
-
 	location, _ := time.LoadLocation(zone[0])
 	time := req.Date.In(location).Format("15:04:05")
-	// Send response back to client as JSON
+	// Send response back as JSON
 	w.WriteHeader(http.StatusOK)
 	response := response{time, zone}
 	if err := json.NewEncoder(w).Encode(&response); err != nil {

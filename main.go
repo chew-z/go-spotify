@@ -72,6 +72,13 @@ func init() {
 		// authorized.GET("/midnight", midnight)
 	}
 
+	router.GET("/_ah/start", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{})
+	})
+	router.GET("/_ah/stop", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{})
+	})
+
 	router.Run()
 
 }

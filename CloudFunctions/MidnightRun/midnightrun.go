@@ -55,8 +55,16 @@ func init() {
 	}
 }
 
-/*MidnightRun -
- */
+/*MidnightRun - does litmus configuration
+also taks care of database maintenance
+It removes all tracks listened to more then a week ago
+TODO - it should also clean unused and failed tokens
+and users who stoped using service
+As the name suggest it is supposed to run once a day at
+midnight. But no hassle to run it by hand.
+
+PS. The movie is great https://youtu.be/LF8cT6ivlr4
+*/
 func MidnightRun(w http.ResponseWriter, r *http.Request) {
 	var newTok firestoreToken
 	trackCounter := 0

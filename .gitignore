@@ -1,6 +1,7 @@
 token.json
 .firebase-credentials.json
 *.json
+go.sum
 deploy.sh
 init.sh
 favicon.png
