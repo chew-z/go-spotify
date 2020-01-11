@@ -2,6 +2,7 @@
 runtime: go113
 env: standard
 
+# for multiple users and traffic all over the day
 # instance_class: F1
 # automatic_scaling:
 #   target_cpu_utilization: 0.85
@@ -11,9 +12,10 @@ env: standard
 #   max_pending_latency: automatic
 #   max_concurrent_requests: 50
 
+# for personal use and infrequent testing
 instance_class: B2
 basic_scaling:
-  max_instances: 3
+  max_instances: 1
 
 # Trick #3
 # gcloud app deploy --version dev
@@ -41,7 +43,7 @@ handlers:
 # static files in the static/ directory.
   - url: /static
     static_dir: static
-    expiration: "30d"
+    expiration: "7d"
 
 
 includes:

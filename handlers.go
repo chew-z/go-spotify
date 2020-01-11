@@ -55,19 +55,20 @@ type audioTrack struct {
 	Image            string
 }
 type userLocation struct {
+	Name    string
+	URL     string
+	Country string
+	Time    string
+	Tz      string
 	Lat     string
 	Lon     string
 	City    string
-	Country string
-	Tz      string
-	Name    string
-	URL     string
 }
 
 const (
 	maxLists       = 5
 	maxTracks      = 5
-	pageLimit      = 25
+	pageLimit      = 24
 	cookieLifetime = 15
 	//TODO - store for user, or change logic
 	defaultMoodPlaylistID = "7vUhitas9hJkonwMx5t0z5"

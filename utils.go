@@ -49,6 +49,11 @@ func getJSON(url string, result interface{}) error {
 	}
 	return nil
 }
+
+/*getUserLocation - on AppEngine it is getting City, lat/lon
+from AppEngine-specific request headers and using microservice
+to get timezone from lat/lon
+*/
 func getUserLocation(c *gin.Context) *userLocation {
 	type response struct {
 		Time string   `json:"time"`
@@ -59,6 +64,9 @@ func getUserLocation(c *gin.Context) *userLocation {
 		loc        userLocation
 	)
 	loc.City = strings.Title(c.Request.Header.Get("X-AppEngine-City"))
+	if loc.City == "?" {
+		loc.City = ""
+	}
 	latlon := c.Request.Header.Get("X-AppEngine-CityLatLong")
 	if latlon != "" {
 		ll := strings.Split(latlon, ",")
@@ -69,6 +77,7 @@ func getUserLocation(c *gin.Context) *userLocation {
 	err := getJSON(url, &tzResponse)
 	if err == nil {
 		loc.Tz = tzResponse.Zone[0]
+		loc.Time = tzResponse.Time
 	}
 	return &loc
 }
