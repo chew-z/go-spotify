@@ -468,7 +468,7 @@ func moodFromHistory(c *gin.Context) {
 func user(c *gin.Context) {
 	spotifyClient := clientMagic(c)
 	Loc := getUserLocation(c)
-	log.Printf("city: %s, lat: %s, lon: %s, timezone: %s", Loc.City, Loc.Lat, Loc.Lon, Loc.Tz)
+	log.Printf("city: %s, lat: %s, lon: %s, timezone: %s, time: %s", Loc.City, Loc.Lat, Loc.Lon, Loc.Tz, Loc.Time)
 	if spotifyClient != nil {
 		// use the client to make calls that require authorization
 		user, err := spotifyClient.CurrentUser()

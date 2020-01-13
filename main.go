@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"log"
 	"net/http"
 	"os"
 
@@ -27,6 +28,10 @@ func main() {
 }
 
 func init() {
+	projectID := os.Getenv("GOOGLE_CLOUD_PROJECT")
+	if projectID == "" {
+		log.Panic("GOOGLE_CLOUD_PROJECT must be set")
+	}
 	firestoreClient = initFirestoreDatabase(ctx)
 
 	router := gin.Default()
@@ -79,6 +84,6 @@ func init() {
 		c.JSON(http.StatusOK, gin.H{})
 	})
 
-	router.Run("0.0.0.0:8080")
+	router.Run()
 
 }

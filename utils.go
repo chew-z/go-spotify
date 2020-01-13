@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"math"
 	"net/http"
@@ -19,6 +20,8 @@ import (
 	"google.golang.org/api/option"
 )
 
+var timezonesURL = os.Getenv("TIMEZONES_CLOUD_FUNCTION")
+
 /*initFirestoreDatabase - as the name says creates Firestore client
 in Google Cloud it is using project ID, on localhost credentials file
 */
@@ -31,17 +34,54 @@ func initFirestoreDatabase(ctx context.Context) *firestore.Client {
 	return firestoreClient
 }
 
+/*getJWToken - make hops to obtain isigned JWT token with service account
+giving authorized access to CloudFunction (audience == CloudFunction URL)
+Only works from inside Google Cloud not on localhost
+https://cloud.google.com/compute/docs/instances/verifying-instance-identity#request_signature
+*/
+func getJWToken(audience string) string {
+	const meta = "http://metadata/computeMetadata/v1/instance/service-accounts/default/identity?audience="
+	auURL := fmt.Sprintf("%s%s", meta, audience)
+	client := &http.Client{
+		Timeout: 5 * time.Second,
+	}
+	req, err := http.NewRequest("GET", auURL, nil)
+	req.Header.Add("Metadata-Flavor", "Google")
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Println(err.Error())
+	}
+	// convert response.Body to text
+	bodyBytes, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		log.Println(err.Error())
+	}
+	return string(bodyBytes)
+}
+
 /*getJSON fetches the contents of the given URL and decodes it as JSON
 into the given result, which should be a pointer to the expected data.
 */
-func getJSON(url string, result interface{}) error {
-	resp, err := http.Get(url)
+func getJSON(url string, audience string, result interface{}) error {
+	var signedJWT string
+	client := &http.Client{
+		Timeout: 10 * time.Second,
+	}
+	req, err := http.NewRequest("GET", url, nil)
+	req.Header.Add("content-type", "application/json")
+	// if on AppEngine get JWT for service account with access to Cloud Function
+	if gae := os.Getenv("GAE_APPLICATION"); gae != "" {
+		signedJWT = getJWToken(audience)
+		req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", signedJWT))
+	}
+	// Now make authorized call to CloudFunction (or fall silently if invoker isn't set to allUsers)
+	resp, err := client.Do(req)
 	if err != nil {
 		return fmt.Errorf("cannot fetch URL %q: %v", url, err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("unexpected http GET status: %s", resp.Status)
+		return fmt.Errorf("unexpected http status: %s", resp.Status)
 	}
 	err = json.NewDecoder(resp.Body).Decode(result)
 	if err != nil {
@@ -73,8 +113,8 @@ func getUserLocation(c *gin.Context) *userLocation {
 		loc.Lat = ll[0]
 		loc.Lon = ll[1]
 	}
-	url := fmt.Sprintf("https://europe-west1-go-spotify-262707.cloudfunctions.net/TimeZones?lat=%s&lon=%s", loc.Lat, loc.Lon)
-	err := getJSON(url, &tzResponse)
+	url := fmt.Sprintf("%s?lat=%s&lon=%s", timezonesURL, loc.Lat, loc.Lon)
+	err := getJSON(url, timezonesURL, &tzResponse)
 	if err == nil {
 		loc.Tz = tzResponse.Zone[0]
 		loc.Time = tzResponse.Time

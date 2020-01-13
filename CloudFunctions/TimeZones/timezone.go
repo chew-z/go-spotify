@@ -43,7 +43,6 @@ func TimeZones(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "Error: %s", err)
 		return
 	}
-	// log.Printf("Date %v, Lat %v, Lon %v", req.Date, req.Lat, req.Lon)
 	if req.Date.IsZero() {
 		req.Date = time.Now()
 	}
@@ -51,6 +50,7 @@ func TimeZones(w http.ResponseWriter, r *http.Request) {
 		req.Lat = 52.237
 		req.Lon = 21.017
 	}
+	// log.Printf("Date %v, Lat %v, Lon %v", req.Date, req.Lat, req.Lon)
 	zone, err := tz.GetZone(tz.Point{
 		Lon: req.Lon, Lat: req.Lat,
 	})
