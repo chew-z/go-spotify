@@ -13,7 +13,7 @@ import (
 /* TODO
 -- gracefull handling of zmb3/spotify errors
 like 403 lack of scope, unexpected endpoint etc.
-
+or 429 and Retry-After header
 -- save/retrieve token in firestore
 */
 var (
@@ -79,6 +79,6 @@ func init() {
 		c.JSON(http.StatusOK, gin.H{})
 	})
 
-	router.Run()
+	router.Run("0.0.0.0:8080")
 
 }

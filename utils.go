@@ -13,8 +13,8 @@ import (
 	"time"
 
 	"cloud.google.com/go/firestore"
+	spotify "github.com/chew-z/spotify"
 	"github.com/gin-gonic/gin"
-	"github.com/zmb3/spotify"
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
 )

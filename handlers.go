@@ -9,11 +9,11 @@ import (
 	"time"
 
 	"cloud.google.com/go/firestore"
+	spotify "github.com/chew-z/spotify"
 	"github.com/gin-gonic/contrib/sessions"
 	"github.com/gin-gonic/gin"
 	guuid "github.com/google/uuid"
 	"github.com/patrickmn/go-cache"
-	"github.com/zmb3/spotify"
 	"google.golang.org/api/iterator"
 )
 
