@@ -1,16 +1,22 @@
 package main
 
 import (
+	"context"
 	"fmt"
+	"io/ioutil"
 	"log"
+	"net/http"
+	"os"
 	"time"
 
 	"cloud.google.com/go/firestore"
 	spotify "github.com/chew-z/spotify"
+	"github.com/coreos/go-oidc"
 	"github.com/gin-gonic/contrib/sessions"
 	"github.com/gin-gonic/gin"
 	"github.com/patrickmn/go-cache"
 	"golang.org/x/oauth2"
+	"google.golang.org/api/option"
 )
 
 type firestoreToken struct {
@@ -178,4 +184,123 @@ func updateTokenInDB(token *firestoreToken) {
 		log.Printf("updateToken: Saved token for %s into Firestore", path)
 		log.Printf("updateToken: Token expiration %s", token.token.Expiry.In(location).Format("15:04:05"))
 	}
+}
+
+/*initFirestoreDatabase - as the name says creates Firestore client
+in Google Cloud it is using project ID, on localhost credentials file
+It works for AppEngine, CloudRun/Docker and local testing
+*/
+func initFirestoreDatabase(ctx context.Context) *firestore.Client {
+	// Google App Engine
+	if gae != "" {
+		// Not possible locally or on Cloud Run/Docker
+		firestoreClient, err := firestore.NewClient(ctx, os.Getenv("GOOGLE_CLOUD_PROJECT"))
+		if err != nil {
+			log.Panic(err)
+		}
+		log.Println("GOOGLE_APP_ENGINE")
+		return firestoreClient
+	}
+	// Google Cloud Run
+	// https://github.com/googleapis/google-cloud-go/blob/master/firestore/client.go#L62
+	// Read the code and consider that firebase programmers are weird, it's not how it works
+	// in official Google examples for other parts of ecosystem
+	if gcr != "" {
+		sa := option.WithCredentialsFile(".go-spotify-262707.json")
+		firestoreClient, err := firestore.NewClient(ctx, "*detect-project-id*", sa)
+		if err != nil {
+			log.Panic(err)
+		}
+		log.Println("GOOGLE_CLOUD_RUN")
+		return firestoreClient
+	}
+	// Default - local testing
+	sa := option.WithCredentialsFile(".firebase-credentials.json")
+	firestoreClient, err := firestore.NewClient(ctx, os.Getenv("GOOGLE_CLOUD_PROJECT"), sa)
+	if err != nil {
+		log.Panic(err)
+	}
+	log.Println("LOCAL")
+	return firestoreClient
+}
+
+/*getJWToken - make hops to obtain isigned JWT token with service account
+giving authorized access to CloudFunction (audience == CloudFunction URL)
+Only works from inside Google Cloud not on localhost or Google Cloud Run
+https://cloud.google.com/compute/docs/instances/verifying-instance-identity#request_signature
+*/
+func getJWToken(audience string) string {
+	const meta = "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity?audience="
+	auURL := fmt.Sprintf("%s%s", meta, audience)
+	client := &http.Client{
+		Timeout: 5 * time.Second,
+	}
+	req, err := http.NewRequest("GET", auURL, nil)
+	req.Header.Add("Metadata-Flavor", "Google")
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Println(err.Error())
+	}
+	// convert response.Body to text
+	bodyBytes, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		log.Println(err.Error())
+	}
+	return string(bodyBytes)
+}
+
+func verifyGoogleIDToken(ctx context.Context, aud string, token string) (bool, error) {
+	const googleRootCertURL = "https://www.googleapis.com/oauth2/v3/certs"
+	keySet := oidc.NewRemoteKeySet(ctx, googleRootCertURL)
+	// https://github.com/coreos/go-oidc/blob/master/verify.go#L36
+	var config = &oidc.Config{
+		SkipClientIDCheck: false,
+		ClientID:          aud,
+	}
+	verifier := oidc.NewVerifier("https://accounts.google.com", keySet, config)
+	idt, err := verifier.Verify(ctx, token)
+	if err != nil {
+		return false, err
+	}
+	log.Printf("Verified id_token with Issuer %v: ", idt.Issuer)
+	return true, nil
+}
+func makeAuthenticatedRequest(jwToken string, url string) string {
+	client := &http.Client{}
+	req, err := http.NewRequest("GET", url, nil)
+	req.Header.Add("content-type", "application/json")
+	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", jwToken))
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	bodyBytes, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	bodyString := string(bodyBytes)
+	// log.Printf("Authenticated Response: %v", bodyString)
+	return bodyString
+}
+
+// Check for network egress configuration (CR-GKE)
+func checkNet() bool {
+	networkEgressError := false
+	client := &http.Client{
+		Timeout: 3 * time.Second,
+	}
+	// Check to see if we can reach something off the cluster e.g. www.google.com
+	req, _ := http.NewRequest("HEAD", "https://www.google.com", nil)
+	res, err := client.Do(req)
+	if err == nil && res.StatusCode >= 200 && res.StatusCode <= 299 {
+		// egress worked successfully
+		log.Print("Verified that network egress is working as expected.")
+	} else {
+		log.Print("Network egress appears to be blocked. Unable to access https://www.google.com.")
+		networkEgressError = true
+	}
+	return networkEgressError
 }

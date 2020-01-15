@@ -1,63 +1,19 @@
 package main
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"math"
 	"net/http"
-	"os"
 	"reflect"
 	"strings"
 	"time"
 
-	"cloud.google.com/go/firestore"
 	spotify "github.com/chew-z/spotify"
 	"github.com/gin-gonic/gin"
 	"google.golang.org/api/iterator"
-	"google.golang.org/api/option"
 )
-
-var timezonesURL = os.Getenv("TIMEZONES_CLOUD_FUNCTION")
-
-/*initFirestoreDatabase - as the name says creates Firestore client
-in Google Cloud it is using project ID, on localhost credentials file
-*/
-func initFirestoreDatabase(ctx context.Context) *firestore.Client {
-	sa := option.WithCredentialsFile(".firebase-credentials.json")
-	firestoreClient, err := firestore.NewClient(ctx, os.Getenv("GOOGLE_CLOUD_PROJECT"), sa)
-	if err != nil {
-		log.Panic(err)
-	}
-	return firestoreClient
-}
-
-/*getJWToken - make hops to obtain isigned JWT token with service account
-giving authorized access to CloudFunction (audience == CloudFunction URL)
-Only works from inside Google Cloud not on localhost
-https://cloud.google.com/compute/docs/instances/verifying-instance-identity#request_signature
-*/
-func getJWToken(audience string) string {
-	const meta = "http://metadata/computeMetadata/v1/instance/service-accounts/default/identity?audience="
-	auURL := fmt.Sprintf("%s%s", meta, audience)
-	client := &http.Client{
-		Timeout: 5 * time.Second,
-	}
-	req, err := http.NewRequest("GET", auURL, nil)
-	req.Header.Add("Metadata-Flavor", "Google")
-	resp, err := client.Do(req)
-	if err != nil {
-		log.Println(err.Error())
-	}
-	// convert response.Body to text
-	bodyBytes, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		log.Println(err.Error())
-	}
-	return string(bodyBytes)
-}
 
 /*getJSON fetches the contents of the given URL and decodes it as JSON
 into the given result, which should be a pointer to the expected data.
@@ -70,7 +26,7 @@ func getJSON(url string, audience string, result interface{}) error {
 	req, err := http.NewRequest("GET", url, nil)
 	req.Header.Add("content-type", "application/json")
 	// if on AppEngine get JWT for service account with access to Cloud Function
-	if gae := os.Getenv("GAE_APPLICATION"); gae != "" {
+	if gae != "" || gcr != "" {
 		signedJWT = getJWToken(audience)
 		req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", signedJWT))
 	}

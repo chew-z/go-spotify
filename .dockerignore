@@ -1,0 +1,11 @@
+bin/**
+.env.yaml
+app.yaml
+app.json
+README.md
+*.sh
+*.bak
+*.bak.go
+CloudFunctions/**
+spotify.txt
+token.json

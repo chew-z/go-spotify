@@ -80,6 +80,9 @@ var (
 	location, _   = time.LoadLocation(timezone)
 	kaszka        = cache.New(20*time.Minute, 3*time.Minute)
 	redirectURI   = os.Getenv("REDIRECT_URI")
+	gae           = os.Getenv("GAE_ENV")
+	gcr           = os.Getenv("GOOGLE_CLOUD_RUN")
+	timezonesURL  = os.Getenv("TIMEZONES_CLOUD_FUNCTION")
 	// Warning token will fail if you are changing scope (even if you narrow it down) so you might end up with bunch
 	// of useless stored tokens that will keep failing
 	// TODO - procedure for clearing useless token (users will have to re-authorize with Spotify)
@@ -155,7 +158,9 @@ func login(c *gin.Context) {
 		newTok.user = string(user.ID)
 		newTok.country = string(user.Country)
 		tz, err := getTimeZones(string(user.Country))
-		timezone = tz[0] // TODO - this will work for small countries, for Russia, US let user decide
+		if err == nil {
+			timezone = tz[0] // TODO - this will work for small countries, for Russia, US let user decide
+		}
 		newTok.timezone = timezone
 		newTok.path = endpoint
 		newTok.token = newToken

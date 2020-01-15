@@ -1,0 +1,31 @@
+{
+    "name": "go-spotify",
+    "env": {
+        "BACKGROUND_COLOR": {
+            "description": "specify a css color",
+            "value": "#fefefe",
+            "required": false
+        },
+        "TITLE": {
+            "description": "title for your site"
+        },
+        "APP_SECRET": {
+            "generator": "secret"
+        }
+    },
+    "options": {
+        "allow-unauthenticated": false
+    },
+    "hooks": {
+        "precreate": {
+            "commands": [
+                "echo 'test'"
+            ]
+        },
+        "postcreate": {
+            "commands": [
+                "./setup.sh"
+            ]
+        }
+    }
+}
