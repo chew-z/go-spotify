@@ -72,6 +72,8 @@ const (
 	cookieLifetime = 15
 	//TODO - store for user, or change logic
 	defaultMoodPlaylistID = "7vUhitas9hJkonwMx5t0z5"
+	googleRootCertURL     = "https://www.googleapis.com/oauth2/v3/certs"
+	mETA                  = "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity?audience="
 )
 
 var (
@@ -79,7 +81,7 @@ var (
 	timezone      = "Europe/Warsaw"
 	location, _   = time.LoadLocation(timezone)
 	kaszka        = cache.New(20*time.Minute, 3*time.Minute)
-	redirectURI   = os.Getenv("REDIRECT_URI")
+	redirectURI   = os.Getenv("REDIRECT_URI") // TODO generate callback URI
 	gae           = os.Getenv("GAE_ENV")
 	gcr           = os.Getenv("GOOGLE_CLOUD_RUN")
 	timezonesURL  = os.Getenv("TIMEZONES_CLOUD_FUNCTION")

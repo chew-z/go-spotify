@@ -32,6 +32,10 @@ func init() {
 	if projectID == "" {
 		log.Panic("GOOGLE_CLOUD_PROJECT must be set")
 	}
+	if checkNet() {
+		log.Fatal("THERE IS NOTHING we can do without access to internet")
+	}
+
 	firestoreClient = initFirestoreDatabase(ctx)
 
 	router := gin.Default()
@@ -77,13 +81,5 @@ func init() {
 		// authorized.GET("/midnight", midnight)
 	}
 
-	router.GET("/_ah/start", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{})
-	})
-	router.GET("/_ah/stop", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{})
-	})
-
 	router.Run()
-
 }

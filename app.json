@@ -1,13 +1,18 @@
 {
   "name": "go-spotify",
   "env": {
-    "BACKGROUND_COLOR": {
-      "description": "specify a css color",
-      "value": "#00ff00",
+    "PROJECT_ID": {
+      "description": "specify your Google Project ID",
+      "value": "go-spotify-",
       "required": false
     },
-    "TITLE": {
-      "description": "go-spotify"
+    "GIN_MODE": {
+      "description": "gin mode debug/release",
+      "value": "debug",
+      "required": false
+    },
+    "SESSION_SECRET": {
+      "description": "Secret key for session"
     }
   },
   "options": {

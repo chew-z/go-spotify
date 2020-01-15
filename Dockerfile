@@ -15,7 +15,7 @@ RUN go mod download
 COPY . .
 
 # Build the command inside the container.
-RUN CGO_ENABLED=0 GOOS=linux go build -v -o spotify
+RUN CGO_ENABLED=0 GOOS=linux go build -v -o go-spotify
 
 # Use a Docker multi-stage build to create a lean production image.
 # https://docs.docker.com/develop/develop-images/multistage-build/#use-multi-stage-builds
@@ -36,7 +36,7 @@ COPY favicon.ico .
 # For firebase (not really picked up in CloudRun)
 COPY .firebase-credentials.json ./
 # Project service account
-COPY .go-spotify-262707.json ./
+COPY .go-spotify.json ./
 
 # Run the web service on container startup.
 CMD ["/go-spotify"]

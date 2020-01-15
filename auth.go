@@ -206,7 +206,7 @@ func initFirestoreDatabase(ctx context.Context) *firestore.Client {
 	// Read the code and consider that firebase programmers are weird, it's not how it works
 	// in official Google examples for other parts of ecosystem
 	if gcr != "" {
-		sa := option.WithCredentialsFile(".go-spotify-262707.json")
+		sa := option.WithCredentialsFile(os.Getenv("GOOGLE_APPLICATION_CREDENTIALS")) // this is JSON file path
 		firestoreClient, err := firestore.NewClient(ctx, "*detect-project-id*", sa)
 		if err != nil {
 			log.Panic(err)
@@ -230,8 +230,7 @@ Only works from inside Google Cloud not on localhost or Google Cloud Run
 https://cloud.google.com/compute/docs/instances/verifying-instance-identity#request_signature
 */
 func getJWToken(audience string) string {
-	const meta = "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity?audience="
-	auURL := fmt.Sprintf("%s%s", meta, audience)
+	auURL := fmt.Sprintf("%s%s", mETA, audience)
 	client := &http.Client{
 		Timeout: 5 * time.Second,
 	}
@@ -250,7 +249,6 @@ func getJWToken(audience string) string {
 }
 
 func verifyGoogleIDToken(ctx context.Context, aud string, token string) (bool, error) {
-	const googleRootCertURL = "https://www.googleapis.com/oauth2/v3/certs"
 	keySet := oidc.NewRemoteKeySet(ctx, googleRootCertURL)
 	// https://github.com/coreos/go-oidc/blob/master/verify.go#L36
 	var config = &oidc.Config{
