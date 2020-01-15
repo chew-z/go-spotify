@@ -3,11 +3,11 @@
     "env": {
         "BACKGROUND_COLOR": {
             "description": "specify a css color",
-            "value": "#fefefe",
+            "value": "#00ff00",
             "required": false
         },
         "TITLE": {
-            "description": "title for your site"
+            "description": "go-spotify"
         },
         "APP_SECRET": {
             "generator": "secret"
@@ -24,7 +24,7 @@
         },
         "postcreate": {
             "commands": [
-                "./setup.sh"
+                "echo ENJOY THIS DAY"
             ]
         }
     }
