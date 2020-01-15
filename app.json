@@ -12,17 +12,5 @@
   },
   "options": {
     "allow-unauthenticated": true
-  },
-  "hooks": {
-    "precreate": {
-      "commands": [
-        "echo 'test'"
-      ]
-    },
-    "postcreate": {
-      "commands": [
-        "echo 'ENJOY THIS DAY'"
-      ]
-    }
   }
 }
