@@ -81,10 +81,6 @@ var (
 	timezone      = "Europe/Warsaw"
 	location, _   = time.LoadLocation(timezone)
 	kaszka        = cache.New(20*time.Minute, 3*time.Minute)
-	redirectURI   = os.Getenv("REDIRECT_URI") // TODO generate callback URI
-	gae           = os.Getenv("GAE_ENV")
-	gcr           = os.Getenv("GOOGLE_CLOUD_RUN")
-	timezonesURL  = os.Getenv("TIMEZONES_CLOUD_FUNCTION")
 	// Warning token will fail if you are changing scope (even if you narrow it down) so you might end up with bunch
 	// of useless stored tokens that will keep failing
 	// TODO - procedure for clearing useless token (users will have to re-authorize with Spotify)
