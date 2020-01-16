@@ -120,10 +120,10 @@ func callback(c *gin.Context) {
 		log.Printf("/callback: Cached client for: %s", endpoint)
 		clientChannel <- &spotifyClient
 	}()
-	url := fmt.Sprintf("http://%s%s?endpoint=%s&id=%s", c.Request.Host, "/login", endpoint, uuid)
+	url := fmt.Sprintf("http://%s%s?endpoint=%s&id=%s", customDomain, "/login", endpoint, uuid)
 	defer func() {
 		log.Printf("callback: redirecting to endpoint %s", url)
-		c.Redirect(303, url)
+		c.Redirect(http.StatusFound, url)
 	}()
 }
 
@@ -180,7 +180,7 @@ func login(c *gin.Context) {
 			return
 		}
 		url := fmt.Sprintf("http://%s%s", c.Request.Host, endpoint)
-		c.Redirect(303, url)
+		c.Redirect(http.StatusSeeOther, url)
 		return
 	}
 	c.JSON(http.StatusTeapot, gin.H{"login": "failed to find cached client"})

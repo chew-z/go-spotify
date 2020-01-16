@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -21,6 +22,8 @@ var (
 	firestoreClient *firestore.Client
 	ctx             = context.Background()
 	sessionSecret   = os.Getenv("SESSION_SECRET")
+	customDomain    = os.Getenv("CUSTOM_DOMAIN")
+	gcrDomain       = os.Getenv("GCR_DOMAIN")
 )
 
 func main() {
@@ -37,9 +40,9 @@ func init() {
 	}
 
 	firestoreClient = initFirestoreDatabase(ctx)
+	store := sessions.NewCookieStore([]byte(sessionSecret))
 
 	router := gin.Default()
-	store := sessions.NewCookieStore([]byte(sessionSecret))
 	router.Use(sessions.Sessions("go-spotify", store))
 
 	router.Static("/static", "./static")
@@ -53,6 +56,8 @@ func init() {
 	})
 	router.GET("/callback", callback)
 	router.GET("/login", login)
+
+	router.Use(Redirector())
 
 	authorized := router.Group("/")
 	authorized.Use(AuthenticationRequired("/user"))
@@ -82,4 +87,25 @@ func init() {
 	}
 
 	router.Run()
+}
+
+/*Redirector - middleware for redirecting CloudRun
+to custom domain
+*/
+func Redirector() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if gcr == "YES" {
+			if domain := c.Request.Host; domain == gcrDomain {
+				url := fmt.Sprintf("https://%s%s", customDomain, c.Request.URL.Path)
+				if qs := c.Request.URL.RawQuery; qs != "" {
+					url += "?" + qs
+				}
+				defer func() {
+					log.Printf("Redirector: redirecting to endpoint %s", url)
+					c.Redirect(http.StatusSeeOther, url)
+					c.Abort()
+				}()
+			}
+		}
+	}
 }
