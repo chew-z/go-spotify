@@ -245,23 +245,31 @@ func getJWToken(audience string) string {
 	if err != nil {
 		log.Println(err.Error())
 	}
-	return string(bodyBytes)
+	token := string(bodyBytes)
+	if token != "" {
+		if verifyToken(audience, token) {
+			return token
+		}
+	}
+	return token
 }
 
-func verifyGoogleIDToken(ctx context.Context, aud string, token string) (bool, error) {
+func verifyToken(audience string, token string) bool {
+	ctx := context.Background()
 	keySet := oidc.NewRemoteKeySet(ctx, googleRootCertURL)
 	// https://github.com/coreos/go-oidc/blob/master/verify.go#L36
 	var config = &oidc.Config{
 		SkipClientIDCheck: false,
-		ClientID:          aud,
+		ClientID:          audience,
 	}
 	verifier := oidc.NewVerifier("https://accounts.google.com", keySet, config)
 	idt, err := verifier.Verify(ctx, token)
 	if err != nil {
-		return false, err
+		log.Printf("CAN NOT verify token %s: ", err.Error())
+		return false
 	}
 	log.Printf("Verified id_token with Issuer %v: ", idt.Issuer)
-	return true, nil
+	return true
 }
 func makeAuthenticatedRequest(jwToken string, url string) string {
 	client := &http.Client{}

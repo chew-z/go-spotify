@@ -70,6 +70,8 @@ func getUserLocation(c *gin.Context) *userLocation {
 		loc.Lon = ll[1]
 	}
 	url := fmt.Sprintf("%s?lat=%s&lon=%s", timezonesURL, loc.Lat, loc.Lon)
+	loc.Time = time.Now().In(location).Format("15:04:03")
+	loc.Tz = timezone
 	err := getJSON(url, timezonesURL, &tzResponse)
 	if err == nil {
 		loc.Tz = tzResponse.Zone[0]
