@@ -1,11 +1,11 @@
 {
-  "name": "go-spotify",
-  "short_name": "go-spotify-262707",
+  "name": "music.suka.yoga",
+  "short_name": "music.suka.yoga",
   "description": "Spotify companion app for better music discovery and analysis.",
   "categories": ["music"],
-  "start_url": "https://go-spotify-262707.appspot.com/user",
+  "start_url": "https://music.suka.yoga/user",
   "lang": "en-US",
-  "scope": "https://go-spotify-262707.appspot.com/",
+  "scope": "https://music.suka.yoga/",
   "icons": [
     {
       "src": "/static/android-chrome-192x192.png",
