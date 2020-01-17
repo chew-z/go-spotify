@@ -3,12 +3,12 @@ package main
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
 	"time"
 
+	"cloud.google.com/go/compute/metadata"
 	"cloud.google.com/go/firestore"
 	spotify "github.com/chew-z/spotify"
 	"github.com/coreos/go-oidc"
@@ -230,28 +230,31 @@ Only works from inside Google Cloud not on localhost or Google Cloud Run
 https://cloud.google.com/compute/docs/instances/verifying-instance-identity#request_signature
 */
 func getJWToken(audience string) string {
-	auURL := fmt.Sprintf("%s%s", mETA, audience)
-	client := &http.Client{
-		Timeout: 5 * time.Second,
-	}
-	req, err := http.NewRequest("GET", auURL, nil)
-	req.Header.Add("Metadata-Flavor", "Google")
-	resp, err := client.Do(req)
+	tokenURL := fmt.Sprintf("/instance/service-accounts/default/identity?audience=%s", audience)
+	jwToken, err := metadata.Get(tokenURL)
 	if err != nil {
-		log.Println(err.Error())
+		log.Printf("metadata.Get: failed to query id_token: %s", err.Error())
 	}
-	// convert response.Body to text
-	bodyBytes, err := ioutil.ReadAll(resp.Body)
+	return jwToken
+}
+
+// Get project ID from metadata server
+func getProjectID() string {
+	metaURL := "/project/project-id"
+	projectID, err := metadata.Get(metaURL)
 	if err != nil {
-		log.Println(err.Error())
+		log.Printf("metadata.Get: failed to get project ID %s", err.Error())
 	}
-	token := string(bodyBytes)
-	if token != "" {
-		if verifyToken(audience, token) {
-			return token
-		}
+	return projectID
+}
+
+func getAccountEmail() string {
+	metaURL := "/instance/service-accounts/default/email"
+	email, err := metadata.Get(metaURL)
+	if err != nil {
+		log.Printf("metadata.Get: failed to get service email %s", err.Error())
 	}
-	return token
+	return email
 }
 
 func verifyToken(audience string, token string) bool {
@@ -268,28 +271,8 @@ func verifyToken(audience string, token string) bool {
 		log.Printf("CAN NOT verify token %s: ", err.Error())
 		return false
 	}
-	log.Printf("Verified id_token with Issuer %v: ", idt.Issuer)
+	log.Printf("Verified id_token with %v: ", idt.Issuer)
 	return true
-}
-func makeAuthenticatedRequest(jwToken string, url string) string {
-	client := &http.Client{}
-	req, err := http.NewRequest("GET", url, nil)
-	req.Header.Add("content-type", "application/json")
-	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", jwToken))
-	resp, err := client.Do(req)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer resp.Body.Close()
-
-	bodyBytes, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	bodyString := string(bodyBytes)
-	// log.Printf("Authenticated Response: %v", bodyString)
-	return bodyString
 }
 
 // Check for network egress configuration (CR-GKE)

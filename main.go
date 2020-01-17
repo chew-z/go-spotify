@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -31,8 +30,10 @@ func main() {
 func init() {
 	projectID := os.Getenv("GOOGLE_CLOUD_PROJECT")
 	if projectID == "" {
-		log.Panic("GOOGLE_CLOUD_PROJECT must be set")
+		projectID = getProjectID()
+		// log.Panic("GOOGLE_CLOUD_PROJECT must be set")
 	}
+	log.Printf("Project ID: %s, service account email: %s", projectID, getAccountEmail())
 	if checkNet() {
 		log.Fatal("THERE IS NOTHING we can do without access to internet")
 	}
@@ -85,25 +86,4 @@ func init() {
 	}
 
 	router.Run()
-}
-
-/*Redirector - middleware for redirecting CloudRun
-to custom domain
-*/
-func Redirector() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		if gcr == "YES" {
-			if domain := c.Request.Host; domain == gcrDomain {
-				url := fmt.Sprintf("https://%s%s", customDomain, c.Request.URL.Path)
-				if qs := c.Request.URL.RawQuery; qs != "" {
-					url += "?" + qs
-				}
-				defer func() {
-					log.Printf("Redirector: redirecting to endpoint %s", url)
-					c.Redirect(http.StatusSeeOther, url)
-					c.Abort()
-				}()
-			}
-		}
-	}
 }

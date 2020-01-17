@@ -72,7 +72,7 @@ const (
 	//TODO - store for user, or change logic
 	defaultMoodPlaylistID = "7vUhitas9hJkonwMx5t0z5"
 	googleRootCertURL     = "https://www.googleapis.com/oauth2/v3/certs"
-	mETA                  = "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity?audience="
+	mETA                  = "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default"
 )
 
 var (

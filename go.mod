@@ -3,6 +3,7 @@ module go-spotify
 go 1.13
 
 require (
+	cloud.google.com/go v0.46.3
 	cloud.google.com/go/firestore v1.1.1
 	github.com/boj/redistore v0.0.0-20180917114910-cd5dcc76aeff // indirect
 	github.com/chew-z/spotify v0.0.21

@@ -15,35 +15,35 @@ import (
 	"google.golang.org/api/iterator"
 )
 
-/*getJSON fetches the contents of the given URL and decodes it as JSON
+type timeZones struct {
+	Time string   `json:"time"`
+	Zone []string `json:"zone"`
+}
+
+/*getTime fetches the contents of the given URL and decodes it as JSON
 into the given result, which should be a pointer to the expected data.
 */
-func getJSON(url string, audience string, result interface{}) error {
-	var signedJWT string
-	client := &http.Client{
-		Timeout: 10 * time.Second,
-	}
-	req, err := http.NewRequest("GET", url, nil)
-	req.Header.Add("content-type", "application/json")
-	// if on AppEngine get JWT for service account with access to Cloud Function
+func getTime(url string) (*timeZones, error) {
+	var result timeZones
 	if gae != "" || gcr != "" {
-		signedJWT = getJWToken(audience)
-		req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", signedJWT))
+		token := getJWToken(timezonesURL)
+		if token != "" {
+			if verifyToken(timezonesURL, token) {
+				req, err := http.NewRequest("GET", url, nil)
+				req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", token))
+				req.Header.Add("content-type", "application/json")
+				resp, err := http.DefaultClient.Do(req)
+				if err != nil {
+					return nil, err
+				}
+				err = json.NewDecoder(resp.Body).Decode(&result)
+				if err != nil {
+					return nil, fmt.Errorf("cannot decode JSON: %v", err)
+				}
+			}
+		}
 	}
-	// Now make authorized call to CloudFunction (or fall silently if invoker isn't set to allUsers)
-	resp, err := client.Do(req)
-	if err != nil {
-		return fmt.Errorf("cannot fetch URL %q: %v", url, err)
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("unexpected http status: %s", resp.Status)
-	}
-	err = json.NewDecoder(resp.Body).Decode(result)
-	if err != nil {
-		return fmt.Errorf("cannot decode JSON: %v", err)
-	}
-	return nil
+	return &result, nil
 }
 
 /*getUserLocation - on AppEngine it is getting City, lat/lon
@@ -51,14 +51,8 @@ from AppEngine-specific request headers and using microservice
 to get timezone from lat/lon
 */
 func getUserLocation(c *gin.Context) *userLocation {
-	type response struct {
-		Time string   `json:"time"`
-		Zone []string `json:"zone"`
-	}
-	var (
-		tzResponse response
-		loc        userLocation
-	)
+	var loc userLocation
+
 	loc.City = strings.Title(c.Request.Header.Get("X-AppEngine-City"))
 	if loc.City == "?" {
 		loc.City = ""
@@ -70,9 +64,7 @@ func getUserLocation(c *gin.Context) *userLocation {
 		loc.Lon = ll[1]
 	}
 	url := fmt.Sprintf("%s?lat=%s&lon=%s", timezonesURL, loc.Lat, loc.Lon)
-	loc.Time = time.Now().In(location).Format("15:04:03")
-	loc.Tz = timezone
-	err := getJSON(url, timezonesURL, &tzResponse)
+	tzResponse, err := getTime(url)
 	if err == nil {
 		loc.Tz = tzResponse.Zone[0]
 		loc.Time = tzResponse.Time
