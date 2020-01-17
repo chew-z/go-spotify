@@ -205,7 +205,7 @@ func initFirestoreDatabase(ctx context.Context) *firestore.Client {
 	// https://github.com/googleapis/google-cloud-go/blob/master/firestore/client.go#L62
 	// Read the code and consider that firebase programmers are weird, it's not how it works
 	// in official Google examples for other parts of ecosystem
-	if gcr != "" {
+	if gcr == "YES" {
 		sa := option.WithCredentialsFile(os.Getenv("GOOGLE_APPLICATION_CREDENTIALS")) // this is JSON file path
 		firestoreClient, err := firestore.NewClient(ctx, "*detect-project-id*", sa)
 		if err != nil {

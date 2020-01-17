@@ -18,6 +18,7 @@ var (
 	customDomain    = os.Getenv("CUSTOM_DOMAIN")
 	gcrDomain       = os.Getenv("GCR_DOMAIN")
 	redirectURI     = os.Getenv("REDIRECT_URI") // TODO generate callback URI
+	projectID       = os.Getenv("GOOGLE_CLOUD_PROJECT")
 	gae             = os.Getenv("GAE_ENV")
 	gcr             = os.Getenv("GOOGLE_CLOUD_RUN")
 	timezonesURL    = os.Getenv("TIMEZONES_CLOUD_FUNCTION")
@@ -28,12 +29,10 @@ func main() {
 }
 
 func init() {
-	projectID := os.Getenv("GOOGLE_CLOUD_PROJECT")
-	if projectID == "" {
-		projectID = getProjectID()
+	if gcr == "YES" {
+		log.Printf("Project ID: %s, service account email: %s", getProjectID(), getAccountEmail())
 		// log.Panic("GOOGLE_CLOUD_PROJECT must be set")
 	}
-	log.Printf("Project ID: %s, service account email: %s", projectID, getAccountEmail())
 	if checkNet() {
 		log.Fatal("THERE IS NOTHING we can do without access to internet")
 	}
