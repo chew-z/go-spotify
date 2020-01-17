@@ -2,6 +2,7 @@ token.json
 .firebase-credentials.json
 *.json
 !app.json
+!cloudbuild.json
 go.sum
 *.sh
 favicon.png
