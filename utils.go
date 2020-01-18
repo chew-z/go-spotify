@@ -65,7 +65,7 @@ func getUserLocation(c *gin.Context) *userLocation {
 	}
 	url := fmt.Sprintf("%s?lat=%s&lon=%s", timezonesURL, loc.Lat, loc.Lon)
 	tzResponse, err := getTime(url)
-	if err == nil {
+	if err == nil && gcr == "YES" {
 		loc.Tz = tzResponse.Zone[0]
 		loc.Time = tzResponse.Time
 	}

@@ -205,7 +205,7 @@ func miniAudioFeatures(ids []spotify.ID, spotifyClient *spotify.Client) *[]audio
 		f.Name = fullTracks[i].Name
 		f.Artists = joinArtists(fullTracks[i].Artists, ", ")
 		f.Energy = int(100.0 * res.Energy)
-		f.Loudness = int(-1.66 * res.Loudness)
+		f.Loudness = int(1.66*res.Loudness + 100)
 		f.Tempo = int(res.Tempo - 100.0)
 		f.Instrumentalness = int(100.0 * res.Instrumentalness)
 		f.Acousticness = int(100.0 * res.Acousticness)
