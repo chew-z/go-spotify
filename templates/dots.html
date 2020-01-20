@@ -1,0 +1,87 @@
+<!--tracks.html-->
+
+<!--Embed the header.html template at this location-->
+{{ template "header.html" .}}
+
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.9.3/Chart.bundle.min.js" integrity="sha256-TQq84xX6vkwR0Qs1qH5ADkP+MvH0W+9E7TdHJsoIQiM=" crossorigin="anonymous"></script>
+<script src="https://www.chartjs.org/samples/latest/utils.js"></script>
+<h4 class="display-4">{{ .title }}</h4>
+<div class="container">
+    {{ with .Navigation }}
+    <a class="btn btn-primary" style="float-left" href="/dots?p={{ .Previous }}" role="button">Previous page</a>
+    <a class="btn btn-primary" style= "float right" href="/dots?p={{ .Next }}" role="button">Next page</a>
+    {{ end }}
+</div>
+
+    <div class="container-fluid">
+        <canvas id="Bubbles"></canvas>
+<script>
+new Chart(document.getElementById("Bubbles"),{
+    type:"bubble",
+    options: {
+            legend: {
+                display: false
+            },
+            scales: {
+                xAxes: [{
+                    ticks: {
+                        suggestedMin: 0,
+                        suggestedMax: 100
+                    },
+                    scaleLabel: {
+                        display: true,
+                        labelString: 'Energy'
+                    }
+                }],
+                yAxes: [{
+                    ticks: {
+                        suggestedMin: 0,
+                        suggestedMax: 100
+                    },
+                    scaleLabel: {
+                        display: true,
+                        labelString: 'Loudness'
+                    }
+                }]
+            }
+        },
+    data:{
+        datasets:[
+        {{ range .Data }}
+            {
+                "label":"{{ .Name }}",
+                "data":[
+                    {"x":{{ .Energy }},"y":{{ .Loudness }},"r":{{ .Tempo }} }
+                ],
+                "backgroundColor":"rgb(255, 99, 132)"
+            },
+        {{ end }}
+            {}
+        ]
+    }
+});
+</script>
+    </div>
+<!-- <div class="container"> -->
+<!--     <div class="card-columns"> -->
+<!--         <div class="card"> -->
+<!--             <div class="row no-gutters"> -->
+<!--                 <div class="col"> -->
+<!--                     <div class="card-body"> -->
+<!--                         <p class="card-title"><a href="{{ .URL }}">{{.Name}}</a></p> -->
+<!--                         <p class="card-text"><em>{{.Artists}}</em></p> -->
+<!--                         <!-1- <a href="#" class="btn btn-primary">BUTTON</a> -1-> -->
+<!--                     </div> -->
+<!--                 </div> -->
+
+<!--                 <div class="col-auto"> -->
+<!--                     <img class="card-img" src="{{ .Image }}" alt="{{ .Name }}"> -->
+<!--                 </div> -->
+<!--             </div> -->
+<!--         </div> -->
+<!--     </div> -->
+<!-- </div> -->
+
+<!--Embed the footer.html template at this location-->
+{{ template "footer.html" .}}

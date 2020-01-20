@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -45,14 +46,15 @@ type audioTrack struct {
 	ID               spotify.ID
 	Name             string
 	Artists          string
+	Instrumentalness int
+	Acousticness     int
 	Energy           int
 	Loudness         int
 	Tempo            int
-	Instrumentalness int
-	Acousticness     int
 	URL              string
 	Image            string
 }
+
 type userLocation struct {
 	Name    string
 	URL     string
@@ -299,6 +301,7 @@ func popular(c *gin.Context) {
 	}
 	c.JSON(http.StatusTeapot, gin.H{"/popular": "failed to find  client"})
 }
+
 func analysis(c *gin.Context) {
 	endpoint := c.Request.URL.Path
 	analysisCookie, err := c.Cookie("analysis_type")
@@ -306,7 +309,18 @@ func analysis(c *gin.Context) {
 		c.SetCookie("analysis_type", c.DefaultQuery("t", "history"), cookieLifetime, endpoint, "", false, true)
 	}
 	log.Printf("Cookie values: %s \n", analysisCookie)
-
+	chunk, _ := strconv.Atoi(c.DefaultQuery("p", "0"))
+	type navigation struct {
+		Previous string
+		Next     string
+	}
+	var Nav navigation
+	Nav.Next = strconv.Itoa(chunk + 1)
+	if chunk == 0 {
+		Nav.Previous = "0"
+	} else {
+		Nav.Previous = strconv.Itoa(chunk - 1)
+	}
 	spotifyClient := clientMagic(c)
 	if spotifyClient == nil {
 		c.JSON(http.StatusTeapot, gin.H{"/analysis": "failed to find  client"})
@@ -349,8 +363,81 @@ func analysis(c *gin.Context) {
 			http.StatusOK,
 			"chart.html",
 			gin.H{
-				"Data":  *data,
-				"title": "Chart",
+				"Data":       *data,
+				"title":      "Chart",
+				"Navigation": Nav,
+			},
+		)
+	}()
+}
+func dots(c *gin.Context) {
+	endpoint := c.Request.URL.Path
+	analysisCookie, err := c.Cookie("analysis_type")
+	chunk, _ := strconv.Atoi(c.DefaultQuery("p", "0"))
+	type navigation struct {
+		Previous string
+		Next     string
+	}
+	var Nav navigation
+	Nav.Next = strconv.Itoa(chunk + 1)
+	if chunk == 0 {
+		Nav.Previous = "0"
+	} else {
+		Nav.Previous = strconv.Itoa(chunk - 1)
+	}
+	if err != nil {
+		c.SetCookie("analysis_type", c.DefaultQuery("t", "history"), cookieLifetime, endpoint, "", false, true)
+	}
+	log.Printf("Cookie values: %s \n", analysisCookie)
+
+	spotifyClient := clientMagic(c)
+	if spotifyClient == nil {
+		c.JSON(http.StatusTeapot, gin.H{"/analysis": "failed to find  client"})
+		return
+	}
+	defer func() {
+		var q firestore.Query
+		session := sessions.Default(c)
+		user := session.Get("user")
+		if user == nil {
+			u, err := spotifyClient.CurrentUser()
+			if err != nil {
+				log.Panic(err)
+			}
+			user = string(u.ID)
+		}
+		if aT := c.DefaultQuery("t", analysisCookie); aT == "popular" {
+			path := fmt.Sprintf("users/%s/popular_tracks", user)
+			q = firestoreClient.Collection(path).OrderBy("count", firestore.Desc).Limit(pageLimit * (chunk + 1))
+		} else {
+			path := fmt.Sprintf("users/%s/recently_played", user)
+			q = firestoreClient.Collection(path).OrderBy("played_at", firestore.Desc).Limit(pageLimit * (chunk + 1))
+		}
+		iter := q.Documents(ctx)
+		trackIDs := []spotify.ID{}
+		defer iter.Stop()
+		for {
+			doc, err := iter.Next()
+			if err == iterator.Done {
+				break
+			}
+			if err != nil {
+				log.Println(err.Error())
+			}
+			trackID := spotify.ID(doc.Ref.ID)
+			trackIDs = append(trackIDs, trackID)
+		}
+		data := miniTrackAttributes(chunk+1, trackIDs, spotifyClient)
+		if err != nil {
+			log.Println(err.Error())
+		}
+		c.HTML(
+			http.StatusOK,
+			"chart.html",
+			gin.H{
+				"Data":       data,
+				"title":      "Chart",
+				"Navigation": Nav,
 			},
 		)
 	}()

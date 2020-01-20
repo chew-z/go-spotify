@@ -72,6 +72,7 @@ func init() {
 		// HIDDEN from menu
 		authorized.GET("/logout", logout)
 		// TODO - make useful
+		authorized.GET("/dots", dots)
 		authorized.GET("/tracks", tracks)
 		authorized.GET("/playlists", playlists)
 		authorized.GET("/albums", albums)

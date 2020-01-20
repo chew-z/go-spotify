@@ -3,19 +3,11 @@
 <!--Embed the header.html template at this location-->
 {{ template "header.html" .}}
 
-<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.9.3/Chart.bundle.min.js" integrity="sha256-TQq84xX6vkwR0Qs1qH5ADkP+MvH0W+9E7TdHJsoIQiM=" crossorigin="anonymous"></script>
-<script src="https://www.chartjs.org/samples/latest/utils.js"></script>
+
 <h4 class="display-4">{{ .title }}</h4>
 
-<div class="container">
-<ul class="pagination justify-content-end">
-    {{ with .Navigation }}
-    <li class="page-item"><a class="page-link" href="/chart?p={{ .Previous }}">Previous</a></li>
-    <li class="page-item"><a class="page-link" href="/chart?p={{ .Next }}">Next</a></li>
-    {{ end }}
-</ul>
-</div>
 <div class="container">
     <div class="card-columns">
         {{ range .Data }}
@@ -35,12 +27,10 @@
                 </div>
             </div>
             <script>
-var chartColors = window.chartColors;
-var color = Chart.helpers.color;
 var ctx = document.getElementById('{{ .ID }}').getContext('2d');
 var chart = new Chart(ctx, {
     // The type of chart we want to create
-    type: 'polarArea',
+    type: 'radar',
     // The data for our dataset
     data: {
         labels: ['Energy', 'Loudness', 'Tempo','Instrumentalness', 'Acousticness'],
@@ -49,14 +39,7 @@ var chart = new Chart(ctx, {
                 label: '{{ .Name }}',
                 // backgroundColor: 'rgb(255, {{ .Loudness }}, {{ .Tempo }})',
                 // borderColor: 'rgb({{ .Energy }}, {{ .Instrumentalness }}, {{ .Acousticness }} )',
-                data: [ {{ .Energy}}, {{ .Loudness }}, {{ .Tempo }}, {{ .Instrumentalness }}, {{ .Acousticness }}],
-                backgroundColor: [
-                        color(chartColors.red).alpha(0.5).rgbString(),
-                        color(chartColors.orange).alpha(0.5).rgbString(),
-                        color(chartColors.yellow).alpha(0.5).rgbString(),
-                        color(chartColors.green).alpha(0.5).rgbString(),
-                        color(chartColors.blue).alpha(0.5).rgbString(),
-                    ]
+                data: [ {{ .Energy}}, {{ .Loudness }}, {{ .Tempo }}, {{ .Instrumentalness }}, {{ .Acousticness }}]
             }]
     },
     // Configuration options go here
@@ -70,14 +53,6 @@ var chart = new Chart(ctx, {
         </div>
         {{ end }}
     </div>
-</div>
-<div class="container">
-<ul class="pagination justify-content-end">
-    {{ with .Navigation }}
-    <li class="page-item"><a class="page-link" href="/chart?p={{ .Previous }}">Previous</a></li>
-    <li class="page-item"><a class="page-link" href="/chart?p={{ .Next }}">Next</a></li>
-    {{ end }}
-</ul>
 </div>
 
 <!--Embed the footer.html template at this location-->

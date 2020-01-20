@@ -204,11 +204,35 @@ func miniAudioFeatures(ids []spotify.ID, spotifyClient *spotify.Client) *[]audio
 		f.ID = res.ID
 		f.Name = fullTracks[i].Name
 		f.Artists = joinArtists(fullTracks[i].Artists, ", ")
+		f.Acousticness = int(100.0 * res.Acousticness)
+		f.Instrumentalness = int(100.0 * res.Instrumentalness)
 		f.Energy = int(100.0 * res.Energy)
 		f.Loudness = int(1.66*res.Loudness + 100)
 		f.Tempo = int(res.Tempo - 100.0)
-		f.Instrumentalness = int(100.0 * res.Instrumentalness)
+		f.URL = fullTracks[i].ExternalURLs["spotify"]
+		f.Image = fullTracks[i].Album.Images[2].URL
+		audioTracks = append(audioTracks, f)
+	}
+	return &audioTracks
+}
+func miniTrackAttributes(chunk int, ids []spotify.ID, spotifyClient *spotify.Client) *[]audioTrack {
+	var f audioTrack
+	var audioTracks []audioTrack
+	chunks := chunkIDs(ids, pageLimit)
+	audioFeatures, _ := spotifyClient.GetAudioFeatures(chunks[chunk]...) // GetAudioFeatures has variadic argument
+	fullTracks, _ := fullTrackGetMany(spotifyClient, chunks[chunk])
+	for i, res := range audioFeatures {
+		if res.ID != fullTracks[i].ID {
+			log.Println("miniAudioFeatures: NOT IN SYNC")
+		}
+		f.ID = res.ID
+		f.Name = fullTracks[i].Name
+		f.Artists = joinArtists(fullTracks[i].Artists, ", ")
 		f.Acousticness = int(100.0 * res.Acousticness)
+		f.Instrumentalness = int(100.0 * res.Instrumentalness)
+		f.Energy = int(100.0 * res.Energy)
+		f.Loudness = int(res.Loudness)
+		f.Tempo = int(res.Tempo)
 		f.URL = fullTracks[i].ExternalURLs["spotify"]
 		f.Image = fullTracks[i].Album.Images[2].URL
 		audioTracks = append(audioTracks, f)
