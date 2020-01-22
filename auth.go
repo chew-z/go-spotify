@@ -19,14 +19,6 @@ import (
 	"google.golang.org/api/option"
 )
 
-type firestoreToken struct {
-	user     string        // Spotify user ID
-	country  string        // The country of the user, as set in the user's account profile
-	timezone string        // TODO let user set timezone
-	path     string        // authorization path (gin routes group)
-	token    *oauth2.Token // Spotify token
-}
-
 /*TODO
 The big unknown is what happens when user deauthorizes our app in preferences
 without letting us know

@@ -13,13 +13,6 @@ import (
 	"google.golang.org/api/iterator"
 )
 
-type recommendationParameters struct {
-	Seeds           spotify.Seeds
-	TrackAttributes *spotify.TrackAttributes
-	FromYear        int
-	MinTrackCount   int
-}
-
 /* recommendFromHistory - (like recommendFromMood but latest tracks
 are taken from Firebase store (unique tracks etc.)
 TODO - add limit as parameter (short, medium, long)

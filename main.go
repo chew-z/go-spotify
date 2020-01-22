@@ -69,14 +69,13 @@ func init() {
 		// HTML pages
 		authorized.GET("/top", top)
 		authorized.GET("/popular", popular)
-		authorized.GET("/chart", dots)
+		authorized.GET("/chart", charts)
 		authorized.GET("/history", history)
 		authorized.GET("/mood", moodFromHistory)
 		authorized.GET("/user", user)
 		// HIDDEN from menu
 		authorized.GET("/logout", logout)
 		// TODO - make useful
-		authorized.GET("/dots", dots)
 		authorized.GET("/tracks", tracks)
 		authorized.GET("/playlists", playlists)
 		authorized.GET("/albums", albums)
@@ -84,9 +83,6 @@ func init() {
 		authorized.GET("/artists", artists)
 		authorized.GET("/search", search)
 		authorized.GET("/recommend", recommend)
-		authorized.GET("/spot", spot)
-		// DISABLED TODO - move to Cloud Function
-		// authorized.GET("/midnight", midnight)
 	}
 
 	router.Run()

@@ -17,16 +17,6 @@ import (
 	"google.golang.org/api/iterator"
 )
 
-type timeZones struct {
-	Time string   `json:"time"`
-	Zone []string `json:"zone"`
-}
-type navigation struct {
-	Previous string
-	Current  string
-	Next     string
-}
-
 /*getTime fetches the contents of the given URL and decodes it as JSON
 into the given result, which should be a pointer to the expected data.
 */

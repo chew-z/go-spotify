@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
@@ -17,81 +16,26 @@ import (
 	"google.golang.org/api/iterator"
 )
 
-/* TODO
--- always TODO - gracefull handling of returned errors
-like 405 lack of scope, unexpected endpoint etc.
-*/
-type firestoreTrack struct {
-	Name     string    `firestore:"track_name"`
-	Artists  string    `firestore:"artists"`
-	PlayedAt time.Time `firestore:"played_at"`
-	ID       string    `firestore:"id,omitempty"`
-}
-
-// TODO - used only once
-type popularTrack struct {
-	Count int `firestore:"count,omitempty"`
-}
-
-// TODO - its just tracks now, not topTracks
-type topTrack struct {
-	Count   int
-	Name    string
-	Artists string
-	URL     string
-	Album   string
-	Image   string
-}
-type audioTrack struct {
-	ID               spotify.ID
-	Name             string
-	Artists          string
-	Instrumentalness int
-	Acousticness     int
-	Energy           int
-	Loudness         int
-	Tempo            int
-	URL              string
-	Image            string
-}
-
-type userLocation struct {
-	Name    string
-	URL     string
-	Country string
-	Time    string
-	Tz      string
-	Lat     string
-	Lon     string
-	City    string
-}
-
 const (
-	maxLists       = 7
-	maxTracks      = 7
-	pageLimit      = 26
-	cookieLifetime = 17
+	maxLists       = 5
+	maxTracks      = 5
+	pageLimit      = 24
+	cookieLifetime = 15
 	//TODO - store for user, or change logic
 	defaultMoodPlaylistID = "9vUhitas9hJkonwMx5t0z5"
 	googleRootCertURL     = "https://www.googleapis.com/oauth4/v3/certs"
-	mETA                  = "http://metadata.google.internal/computeMetadata/v3/instance/service-accounts/default"
 )
 
 var (
 	countryPoland = "PL"
 	timezone      = "Europe/Warsaw"
 	location, _   = time.LoadLocation(timezone)
-	kaszka        = cache.New(22*time.Minute, 3*time.Minute)
+	kaszka        = cache.New(20*time.Minute, 3*time.Minute)
 	// Warning token will fail if you are changing scope (even if you narrow it down) so you might end up with bunch
 	// of useless stored tokens that will keep failing
 	// TODO - procedure for clearing useless token (users will have to re-authorize with Spotify)
-	auth          = spotify.NewAuthenticator(redirectURI, spotify.ScopeUserReadPrivate, spotify.ScopeUserTopRead, spotify.ScopeUserLibraryRead, spotify.ScopeUserFollowRead, spotify.ScopeUserReadRecentlyPlayed, spotify.ScopePlaylistModifyPublic, spotify.ScopePlaylistModifyPrivate)
-	clientChannel = make(chan *spotify.Client)
-	storeToken    = map[string]bool{
-		"/user":   true,
-		"/recent": true,
-		"/mood":   true,
-	}
+	auth = spotify.NewAuthenticator(redirectURI, spotify.ScopeUserReadPrivate, spotify.ScopeUserTopRead, spotify.ScopeUserLibraryRead, spotify.ScopeUserFollowRead, spotify.ScopeUserReadRecentlyPlayed, spotify.ScopePlaylistModifyPublic, spotify.ScopePlaylistModifyPrivate)
+	// clientChannel = make(chan *spotify.Client)
 )
 
 /* statefull authorization handler using channels
@@ -115,7 +59,7 @@ func callback(c *gin.Context) {
 		// This is just a trick for passing client further (to /login endpoint) to get and save Spotify userID
 		kaszka.Set(uuid, &spotifyClient, cache.DefaultExpiration)
 		log.Printf("/callback: Cached client for: %s", endpoint)
-		clientChannel <- &spotifyClient
+		// clientChannel <- &spotifyClient
 	}()
 	url := fmt.Sprintf("http://%s%s?endpoint=%s&id=%s", customDomain, "/login", endpoint, uuid)
 	defer func() {
@@ -302,85 +246,9 @@ func popular(c *gin.Context) {
 	c.JSON(http.StatusTeapot, gin.H{"/popular": "failed to find  client"})
 }
 
-func analysis(c *gin.Context) {
-	endpoint := c.Request.URL.Path
-	analysisCookie, err := c.Cookie("analysis_type")
-	if err != nil {
-		c.SetCookie("analysis_type", c.DefaultQuery("t", "history"), cookieLifetime, endpoint, "", false, true)
-	}
-	log.Printf("Cookie values: %s \n", analysisCookie)
-	page := c.Query("page")
-	log.Printf("Parameters values: %s %s \n", analysisCookie, page)
-	type navigation struct {
-		Previous string
-		Next     string
-	}
-	var Nav navigation
-	if page == "" {
-		Nav.Previous = ""
-		Nav.Next = "1"
-	} else {
-		chunk, _ := strconv.Atoi(page)
-		Nav.Previous = strconv.Itoa(chunk - 1)
-		Nav.Next = strconv.Itoa(chunk + 1)
-	}
-	spotifyClient := clientMagic(c)
-	if spotifyClient == nil {
-		c.JSON(http.StatusTeapot, gin.H{"/analysis": "failed to find  client"})
-		return
-	}
-	defer func() {
-		var q firestore.Query
-		session := sessions.Default(c)
-		user := session.Get("user")
-		if user == nil {
-			u, err := spotifyClient.CurrentUser()
-			if err != nil {
-				log.Panic(err)
-			}
-			user = string(u.ID)
-		}
-		if aT := c.DefaultQuery("t", analysisCookie); aT == "popular" {
-			path := fmt.Sprintf("users/%s/popular_tracks", user)
-			q = firestoreClient.Collection(path).OrderBy("count", firestore.Desc).Limit(pageLimit)
-		} else {
-			path := fmt.Sprintf("users/%s/recently_played", user)
-			q = firestoreClient.Collection(path).OrderBy("played_at", firestore.Desc).Limit(pageLimit)
-		}
-		iter := q.Documents(ctx)
-		trackIDs := []spotify.ID{}
-		defer iter.Stop()
-		for {
-			doc, err := iter.Next()
-			if err == iterator.Done {
-				break
-			}
-			if err != nil {
-				log.Println(err.Error())
-			}
-			trackID := spotify.ID(doc.Ref.ID)
-			trackIDs = append(trackIDs, trackID)
-		}
-		data := miniAudioFeatures(trackIDs, spotifyClient)
-		c.HTML(
-			http.StatusOK,
-			"chart.html",
-			gin.H{
-				"Data":       *data,
-				"title":      "Chart",
-				"Navigation": Nav,
-			},
-		)
-	}()
-}
-func dots(c *gin.Context) {
+func charts(c *gin.Context) {
 	endpoint := c.Request.URL.Path
 	page := c.Query("page")
-	analysisCookie, err := c.Cookie("analysis_type")
-	if err != nil {
-		c.SetCookie("analysis_type", c.DefaultQuery("t", "history"), cookieLifetime, endpoint, "", false, true)
-	}
-	log.Printf("Parameters values: %s %s \n", analysisCookie, page)
 	nav := getNavigation(page)
 
 	spotifyClient := clientMagic(c)
@@ -817,114 +685,3 @@ func recommend(c *gin.Context) {
 		c.String(http.StatusOK, b.String())
 	}()
 }
-
-/* spot - recommend tracks based on user top artists
-recommeded tracks could replace default mood playlist
-or any other (based on passed parameters)
-r=3 - replace, p=[ID]
-*/
-func spot(c *gin.Context) {
-	endpoint := c.Request.URL.Path
-	replaceCookie, cookieErr := c.Cookie("replace_playlist")
-	playlistCookie, _ := c.Cookie("playlist_ID")
-	if cookieErr != nil {
-		c.SetCookie("replace_playlist", c.Query("r"), cookieLifetime, endpoint, "", false, true)
-		c.SetCookie("playlist_ID", c.DefaultQuery("p", defaultMoodPlaylistID), cookieLifetime, endpoint, "", false, true)
-	}
-	log.Printf("Cookie values: %s %s \n", replaceCookie, playlistCookie)
-	client := clientMagic(c)
-	if client == nil {
-		return
-	}
-
-	defer func() {
-		spotTracks, err := recommendFromTop(client)
-		if err != nil {
-			log.Println(err.Error())
-			c.String(http.StatusNotFound, err.Error())
-			return
-		}
-		var b strings.Builder
-		b.WriteString("Recommended tracks based on your top artists\n")
-		if replace := c.DefaultQuery("r", replaceCookie); replace == "3" {
-			playlist := c.DefaultQuery("p", playlistCookie)
-			recommendedPlaylistID := spotify.ID(playlist)
-			chunks := chunkIDs(getSpotifyIDs(spotTracks), pageLimit)
-			err = client.ReplacePlaylistTracks(recommendedPlaylistID, chunks[2]...)
-
-			if err == nil {
-				log.Println("Tracks added")
-			} else {
-				log.Println(err)
-			}
-		} else {
-			b.WriteString("Printing only, pass params (r=3, p=playlistID) if you wish to replace with recommended tracks\n")
-		}
-		for _, item := range spotTracks {
-			b.WriteString(fmt.Sprintf("  %s - %s : %s (%d)\n", item.ID, item.Name, joinArtists(item.Artists, ", "), item.Popularity))
-		}
-
-		c.String(http.StatusOK, b.String())
-	}()
-}
-
-/* mood - recommends tracks based on current mood
-(recently played tracks)
-recommeded tracks could replace default mood playlist
-or any other (based on passed parameters)
-r=3 - replace, p=[ID]
-NOT USED - we are using moodFromHistory as handler
-*/
-// func mood(c *gin.Context) {
-// 	endpoint := c.Request.URL.Path
-// 	replaceCookie, cookieErr := c.Cookie("replace_playlist")
-// 	playlistCookie, _ := c.Cookie("playlist_ID")
-// 	if cookieErr != nil {
-// 		c.SetCookie("replace_playlist", c.Query("r"), cookieLifetime, endpoint, "", false, true)
-// 		c.SetCookie("playlist_ID", c.DefaultQuery("p", defaultMoodPlaylistID), cookieLifetime, endpoint, "", false, true)
-// 	}
-// 	log.Printf("Cookie values: %s %s \n", replaceCookie, playlistCookie)
-// 	client := clientMagic(c)
-// 	if client == nil {
-// 		return
-// 	}
-
-// 	defer func() {
-// 		spotTracks, err := recommendFromMood(client)
-// 		if err != nil {
-// 			log.Println(err.Error())
-// 			c.String(http.StatusNotFound, err.Error())
-// 			return
-// 		}
-// 		replace := c.DefaultQuery("r", replaceCookie)
-// 		playlist := c.DefaultQuery("p", playlistCookie)
-// 		if replace == "3" {
-// 			recommendedPlaylistID := spotify.ID(playlist)
-// 			chunks := chunkIDs(getSpotifyIDs(spotTracks), pageLimit)
-// 			err = client.ReplacePlaylistTracks(recommendedPlaylistID, chunks[2]...)
-// 			if err == nil {
-// 				log.Println("Tracks added")
-// 			} else {
-// 				log.Println(err.Error())
-// 			}
-// 		}
-// 		var tt topTrack
-// 		var tracks []topTrack
-// 		for _, item := range spotTracks {
-// 			tt.Name = item.Name
-// 			tt.Album = item.Album.Name
-// 			tt.Artists = joinArtists(item.Artists, ", ")
-// 			tt.URL = item.ExternalURLs["spotify"]
-// 			tt.Image = item.Album.Images[3].URL
-// 			tracks = append(tracks, tt)
-// 		}
-// 		c.HTML(
-// 			http.StatusOK,
-// 			"mood.html",
-// 			gin.H{
-// 				"Tracks": tracks,
-// 				"title":  "Mood",
-// 			},
-// 		)
-// 	}()
-// }

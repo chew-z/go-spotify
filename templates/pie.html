@@ -3,7 +3,7 @@
 <!--Embed the header.html template at this location-->
 {{ template "header.html" .}}
 <!-- TODO Move scripts to template -->
-<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+<!-- <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script> -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.9.3/Chart.bundle.min.js" integrity="sha256-TQq84xX6vkwR0Qs1qH5ADkP+MvH0W+9E7TdHJsoIQiM=" crossorigin="anonymous"></script>
 <script src="https://www.chartjs.org/samples/latest/utils.js"></script>
 <h4 class="display-4">{{ .title }}</h4>
@@ -22,7 +22,7 @@
     <li class="page-item"><a class="page-link" href="/chart?page={{ .Previous }}">{{ .Previous }}</a></li>
     {{ end }}
     <li class="page-item"><a class="page-link" href="/chart?page={{ .Current }}">{{ .Current }}</a></li>
-    <li class="page-item"><a class="page-link" href="/chart?={{ .Next }}">{{ .Next }}</a></li>
+    <li class="page-item"><a class="page-link" href="/chart?page={{ .Next }}">{{ .Next }}</a></li>
     <li class="page-item">
         <a class="page-link" href="/chart?page={{ .Next }}" aria-label="Next">
         <span aria-hidden="true">&raquo;</span>
@@ -109,7 +109,7 @@ var chart = new Chart(ctx, {
     <li class="page-item"><a class="page-link" href="/chart?page={{ .Previous }}">{{ .Previous }}</a></li>
     {{ end }}
     <li class="page-item"><a class="page-link" href="/chart?page={{ .Current }}">{{ .Current }}</a></li>
-    <li class="page-item"><a class="page-link" href="/chart?={{ .Next }}">{{ .Next }}</a></li>
+    <li class="page-item"><a class="page-link" href="/chart?page={{ .Next }}">{{ .Next }}</a></li>
     <li class="page-item">
         <a class="page-link" href="/chart?page={{ .Next }}" aria-label="Next">
         <span aria-hidden="true">&raquo;</span>
