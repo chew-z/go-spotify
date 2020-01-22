@@ -332,26 +332,36 @@ func searchType(a string) spotify.SearchType {
 		return spotify.SearchTypeTrack
 	}
 }
+
+/*paginateHistory - is a helper func for paginating
+tracks listened to ie. history.
+It returns a firestore query for next/previous page
+chunk size is set by global variable pageLimit (24)
+*/
 func paginateHistory(page string, path string, c *gin.Context) *firestore.Query {
-	var q firestore.Query
+	var q firestore.Query // we will be constructing firestore query here
 	if page != "0" {
-		lastPage, _ := c.Cookie("lastPage")
-		if gtString(lastPage, page) {
-			if lastDoc, err := c.Cookie("lastDoc"); err == nil {
+		lastPage, _ := c.Cookie("lastPage") // where we comming from
+		if ltString(lastPage, page) {       // check if we go back or forward
+			if lastDoc, err := c.Cookie("lastDoc"); err == nil { // lastDoc cookie stores when last track on pages had been playes
 				layout := "2006-01-02 15:04:05 -0700 UTC"
-				t, err := time.Parse(layout, lastDoc)
+				t, err := time.Parse(layout, lastDoc) // convert string from cookie to UTC time
 				if err != nil {
 					log.Println(err.Error())
 				}
+				// start query after last track on previous page (if going forward)
 				q = firestoreClient.Collection(path).OrderBy("played_at", firestore.Desc).
 					StartAfter(t).Limit(pageLimit)
 			}
 		} else {
+			// start query at offset (page size * # tracks on page)
 			p, _ := strconv.Atoi(page)
 			q = firestoreClient.Collection(path).OrderBy("played_at", firestore.Desc).
 				Offset(pageLimit * p).Limit(pageLimit)
 		}
 	} else {
+		// of this is zero page get mist recent tracks (which might have chaged in the meantime
+		// so make no assumptions)
 		q = firestoreClient.Collection(path).OrderBy("played_at", firestore.Desc).Limit(pageLimit)
 	}
 	return &q
@@ -375,11 +385,12 @@ func getNavigation(page string) *navigation {
 	return &nav
 }
 
-/*gtString - this liitle function wraps comparision
-of two numbers passed as a string. Returns true if
-first argument is larger then second.
+/*ltString - this liitle function wraps comparision
+of two numbers passed as a string (from storing in cookie
+and query parameters).
+Returns true if first argument is lower then second.
 */
-func gtString(a string, b string) bool {
+func ltString(a string, b string) bool {
 	i, err := strconv.Atoi(a)
 	if err != nil {
 		i = 0
@@ -388,7 +399,7 @@ func gtString(a string, b string) bool {
 	if err != nil {
 		j = 0
 	}
-	if i < j {
+	if i < j { // a < b
 		return true
 	}
 	return false
