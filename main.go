@@ -51,6 +51,8 @@ func init() {
 	router.LoadHTMLGlob("templates/*")
 	router.Static("/static", "./static")
 	router.StaticFile("/favicon.ico", "./favicon.ico")
+	router.StaticFile("/apple-touch-icon.png", "./static/apple-touch-icon.png")
+	router.StaticFile("/apple-touch-icon-precomposed.png", "./static/apple-touch-icon-precomposed.png")
 
 	router.GET("/", func(c *gin.Context) {
 		c.HTML(http.StatusOK, "main.html", gin.H{})
