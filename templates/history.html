@@ -9,6 +9,14 @@
 <!-- </p> -->
 <h4 class="display-4">{{ .title }}</h4>
 <div class="container">
+<ul class="pagination justify-content-end">
+    {{ with .Navigation }}
+    <li class="page-item"><a class="page-link" href="/history?page={{ .Previous }}">Previous</a></li>
+    <li class="page-item"><a class="page-link" href="/history?page={{ .Next }}">Next</a></li>
+    {{ end }}
+</ul>
+</div>
+<div class="container">
     {{range .Tracks }}
     <div class="card">
         <div class="card-body">

@@ -25,22 +25,24 @@ into the given result, which should be a pointer to the expected data.
 */
 func getTime(url string) (*timeZones, error) {
 	var result timeZones
-	if gae != "" || gcr != "" {
+	result.Time = time.Now().In(location).Format("15:04:05")
+	result.Zone = append(result.Zone, timezone)
+	if gae != "" || gcr == "YES" {
 		token := getJWToken(timezonesURL)
 		if token != "" {
-			if verifyToken(timezonesURL, token) {
-				req, err := http.NewRequest("GET", url, nil)
-				req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", token))
-				req.Header.Add("content-type", "application/json")
-				resp, err := http.DefaultClient.Do(req)
-				if err != nil {
-					return nil, err
-				}
-				err = json.NewDecoder(resp.Body).Decode(&result)
-				if err != nil {
-					return nil, fmt.Errorf("cannot decode JSON: %v", err)
-				}
+			// if verifyToken(timezonesURL, token) {
+			req, err := http.NewRequest("GET", url, nil)
+			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", token))
+			req.Header.Add("content-type", "application/json")
+			resp, err := http.DefaultClient.Do(req)
+			if err != nil {
+				return &result, err
 			}
+			err = json.NewDecoder(resp.Body).Decode(&result)
+			if err != nil {
+				return &result, fmt.Errorf("cannot decode JSON: %v", err)
+			}
+			// }
 		}
 	}
 	return &result, nil

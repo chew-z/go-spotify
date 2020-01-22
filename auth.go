@@ -75,7 +75,7 @@ func AuthenticationRequired(authPath string) gin.HandlerFunc {
 			newTok.user = userString
 			newTok.path = authPath
 			tok, _ := getTokenFromDB(&newTok)
-			log.Printf("/auth: Token expires at: %s", tok.Expiry.In(location).Format("15:04:03"))
+			log.Printf("/auth: Token expires at: %s", tok.Expiry.In(location).Format("15:04:05"))
 			spotifyClient := auth.NewClient(tok)
 			kaszka.Set(uuid, &spotifyClient, cache.DefaultExpiration)
 			// if token in Firestore is close to or past expiration we refresh token and update in database
@@ -122,7 +122,7 @@ func clientMagic(c *gin.Context) *spotify.Client {
 		log.Printf("Couldn't find token for %s", newTok.path)
 		return nil
 	}
-	log.Printf("/clientMagic: Token in Firestore expires at: %s", tok.Expiry.In(location).Format("15:04:03"))
+	log.Printf("/clientMagic: Token in Firestore expires at: %s", tok.Expiry.In(location).Format("15:04:05"))
 	newClient := auth.NewClient(tok)
 	// if an item doesn't already exist for the given key, or if the existing item has expired
 	kaszka.Add(uuid, &newClient, cache.DefaultExpiration)

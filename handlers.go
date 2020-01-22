@@ -19,7 +19,7 @@ import (
 
 /* TODO
 -- always TODO - gracefull handling of returned errors
-like 403 lack of scope, unexpected endpoint etc.
+like 405 lack of scope, unexpected endpoint etc.
 */
 type firestoreTrack struct {
 	Name     string    `firestore:"track_name"`
@@ -31,6 +31,11 @@ type firestoreTrack struct {
 // TODO - used only once
 type popularTrack struct {
 	Count int `firestore:"count,omitempty"`
+}
+
+type navigation struct {
+	Previous string
+	Next     string
 }
 
 // TODO - its just tracks now, not topTracks
@@ -67,21 +72,21 @@ type userLocation struct {
 }
 
 const (
-	maxLists       = 5
-	maxTracks      = 5
-	pageLimit      = 24
-	cookieLifetime = 15
+	maxLists       = 7
+	maxTracks      = 7
+	pageLimit      = 26
+	cookieLifetime = 17
 	//TODO - store for user, or change logic
-	defaultMoodPlaylistID = "7vUhitas9hJkonwMx5t0z5"
-	googleRootCertURL     = "https://www.googleapis.com/oauth2/v3/certs"
-	mETA                  = "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default"
+	defaultMoodPlaylistID = "9vUhitas9hJkonwMx5t0z5"
+	googleRootCertURL     = "https://www.googleapis.com/oauth4/v3/certs"
+	mETA                  = "http://metadata.google.internal/computeMetadata/v3/instance/service-accounts/default"
 )
 
 var (
 	countryPoland = "PL"
 	timezone      = "Europe/Warsaw"
 	location, _   = time.LoadLocation(timezone)
-	kaszka        = cache.New(20*time.Minute, 3*time.Minute)
+	kaszka        = cache.New(22*time.Minute, 3*time.Minute)
 	// Warning token will fail if you are changing scope (even if you narrow it down) so you might end up with bunch
 	// of useless stored tokens that will keep failing
 	// TODO - procedure for clearing useless token (users will have to re-authorize with Spotify)
@@ -96,7 +101,7 @@ var (
 
 /* statefull authorization handler using channels
 state = calling endpoint (which is intended use of scope)
-caches client for as long as token is valid (1 hour for spotify)
+caches client for as long as token is valid (3 hour for spotify)
 no persistent storing of token, there is no need?
 spotify stores persisten cookies behind our back so it is enough?
 */
@@ -193,15 +198,15 @@ session vars, otherwise we have Panic on casting string on nil interface
 func logout(c *gin.Context) {
 	// without clearing Spotify cookie we will be simply re-logged transparently
 	session := sessions.Default(c)
-	session.Clear() // issue #89
+	session.Clear() // issue #91
 	session.Save()
 	log.Printf("/logout: %s", "bye")
 	url := fmt.Sprintf("http://%s%s", c.Request.Host, "/")
-	c.Redirect(303, url)
+	c.Redirect(305, url)
 }
 
 /* top - prints user's top tracks (sensible defaults)
-read zmb3/spotify code to learn more
+read zmb5/spotify code to learn more
 */
 func top(c *gin.Context) {
 	spotifyClient := clientMagic(c)
@@ -219,7 +224,7 @@ func top(c *gin.Context) {
 			tt.Album = item.Album.Name
 			tt.Artists = joinArtists(item.Artists, ", ")
 			tt.URL = item.ExternalURLs["spotify"]
-			tt.Image = item.Album.Images[1].URL
+			tt.Image = item.Album.Images[0].URL
 			tracks = append(tracks, tt)
 		}
 		c.HTML(
@@ -238,9 +243,9 @@ func top(c *gin.Context) {
 /* popular - read counter of how many tracks has been played from Firestore
 and get us sorted list of most popular tracks.
 I see three different ways of doing it:
-1) getting tracks from firestore without calling Spotify API at all
-2) with single call to Spotify API and two loops - GetTracks(ids ...ID)
-3) with single loop and multiple calls to Spotify API - GetTrack(id ID)
+3) getting tracks from firestore without calling Spotify API at all
+4) with single call to Spotify API and two loops - GetTracks(ids ...ID)
+5) with single loop and multiple calls to Spotify API - GetTrack(id ID)
 */
 func popular(c *gin.Context) {
 	spotifyClient := clientMagic(c)
@@ -285,7 +290,7 @@ func popular(c *gin.Context) {
 			tt.Name = topTracks[i].Name
 			tt.Artists = joinArtists(topTracks[i].Artists, ", ")
 			tt.URL = topTracks[i].ExternalURLs["spotify"]
-			tt.Image = topTracks[i].Album.Images[1].URL
+			tt.Image = topTracks[i].Album.Images[0].URL
 			tracks = append(tracks, tt)
 		}
 		// Call the HTML method of the Context to render a template
@@ -309,17 +314,20 @@ func analysis(c *gin.Context) {
 		c.SetCookie("analysis_type", c.DefaultQuery("t", "history"), cookieLifetime, endpoint, "", false, true)
 	}
 	log.Printf("Cookie values: %s \n", analysisCookie)
-	chunk, _ := strconv.Atoi(c.DefaultQuery("p", "0"))
+	page := c.Query("page")
+	log.Printf("Parameters values: %s %s \n", analysisCookie, page)
 	type navigation struct {
 		Previous string
 		Next     string
 	}
 	var Nav navigation
-	Nav.Next = strconv.Itoa(chunk + 1)
-	if chunk == 0 {
-		Nav.Previous = "0"
+	if page == "" {
+		Nav.Previous = ""
+		Nav.Next = "1"
 	} else {
+		chunk, _ := strconv.Atoi(page)
 		Nav.Previous = strconv.Itoa(chunk - 1)
+		Nav.Next = strconv.Itoa(chunk + 1)
 	}
 	spotifyClient := clientMagic(c)
 	if spotifyClient == nil {
@@ -372,31 +380,28 @@ func analysis(c *gin.Context) {
 }
 func dots(c *gin.Context) {
 	endpoint := c.Request.URL.Path
-	analysisCookie, err := c.Cookie("analysis_type")
-	chunk, _ := strconv.Atoi(c.DefaultQuery("p", "0"))
-	type navigation struct {
-		Previous string
-		Next     string
-	}
+	page := c.Query("page")
 	var Nav navigation
-	Nav.Next = strconv.Itoa(chunk + 1)
-	if chunk == 0 {
-		Nav.Previous = "0"
+	if page == "" || page == "0" {
+		Nav.Previous = ""
+		Nav.Next = "1"
 	} else {
+		chunk, _ := strconv.Atoi(page)
 		Nav.Previous = strconv.Itoa(chunk - 1)
+		Nav.Next = strconv.Itoa(chunk + 1)
 	}
+	analysisCookie, err := c.Cookie("analysis_type")
 	if err != nil {
 		c.SetCookie("analysis_type", c.DefaultQuery("t", "history"), cookieLifetime, endpoint, "", false, true)
 	}
-	log.Printf("Cookie values: %s \n", analysisCookie)
+	log.Printf("Parameters values: %s %s \n", analysisCookie, page)
 
 	spotifyClient := clientMagic(c)
 	if spotifyClient == nil {
 		c.JSON(http.StatusTeapot, gin.H{"/analysis": "failed to find  client"})
 		return
 	}
-	defer func() {
-		var q firestore.Query
+	{
 		session := sessions.Default(c)
 		user := session.Get("user")
 		if user == nil {
@@ -406,50 +411,90 @@ func dots(c *gin.Context) {
 			}
 			user = string(u.ID)
 		}
-		if aT := c.DefaultQuery("t", analysisCookie); aT == "popular" {
-			path := fmt.Sprintf("users/%s/popular_tracks", user)
-			q = firestoreClient.Collection(path).OrderBy("count", firestore.Desc).Limit(pageLimit * (chunk + 1))
+		path := fmt.Sprintf("users/%s/recently_played", user)
+		var q firestore.Query
+		if page != "0" {
+			lastPage, _ := c.Cookie("lastPage")
+			if compare(lastPage, page) {
+				if lastDoc, err := c.Cookie("lastDoc"); err == nil {
+					layout := "2006-01-02 15:04:05 -0700 UTC"
+					t, err := time.Parse(layout, lastDoc)
+					if err != nil {
+						log.Println(err.Error())
+					}
+					q = firestoreClient.Collection(path).OrderBy("played_at", firestore.Desc).
+						StartAfter(t).Limit(pageLimit)
+				}
+			} else {
+				p, _ := strconv.Atoi(page)
+				q = firestoreClient.Collection(path).OrderBy("played_at", firestore.Desc).
+					Offset(pageLimit * p).Limit(pageLimit)
+			}
 		} else {
-			path := fmt.Sprintf("users/%s/recently_played", user)
-			q = firestoreClient.Collection(path).OrderBy("played_at", firestore.Desc).Limit(pageLimit * (chunk + 1))
+			q = firestoreClient.Collection(path).OrderBy("played_at", firestore.Desc).Limit(pageLimit)
 		}
-		iter := q.Documents(ctx)
+		docs, err := q.Documents(ctx).GetAll()
+		if err != nil {
+			log.Println(err.Error())
+		}
+		lastDoc := docs[len(docs)-1].Data()["played_at"].(time.Time)
+		c.SetCookie("lastDoc", lastDoc.String(), 1200, endpoint, "", false, true)
+		c.SetCookie("lastPage", page, 1200, endpoint, "", false, true)
 		trackIDs := []spotify.ID{}
-		defer iter.Stop()
-		for {
-			doc, err := iter.Next()
-			if err == iterator.Done {
-				break
-			}
-			if err != nil {
-				log.Println(err.Error())
-			}
+		for _, doc := range docs {
 			trackID := spotify.ID(doc.Ref.ID)
 			trackIDs = append(trackIDs, trackID)
 		}
-		data := miniTrackAttributes(chunk+1, trackIDs, spotifyClient)
+
+		data := miniTrackAttributes(trackIDs, spotifyClient)
 		if err != nil {
 			log.Println(err.Error())
 		}
 		c.HTML(
 			http.StatusOK,
-			"chart.html",
+			"pie.html",
 			gin.H{
-				"Data":       data,
 				"title":      "Chart",
 				"Navigation": Nav,
+				"Data":       data,
 			},
 		)
-	}()
+	}
+}
+func compare(a string, b string) bool {
+	i, err := strconv.Atoi(a)
+	if err != nil {
+		i = 0
+	}
+	j, err := strconv.Atoi(b)
+	if err != nil {
+		j = 0
+	}
+	if i < j {
+		return true
+	}
+	return false
 }
 
 /* history - read saved tracks from Cloud Firestore database
  */
 func history(c *gin.Context) {
+	endpoint := c.Request.URL.Path
 	spotifyClient := clientMagic(c)
 	if spotifyClient == nil {
 		c.JSON(http.StatusTeapot, gin.H{"/history": "failed to find  client"})
 		return
+	}
+	page := c.Query("page")
+	var Nav navigation
+	if page == "" || page == "0" {
+		page = "0"
+		Nav.Previous = ""
+		Nav.Next = "1"
+	} else {
+		chunk, _ := strconv.Atoi(page)
+		Nav.Previous = strconv.Itoa(chunk - 1)
+		Nav.Next = strconv.Itoa(chunk + 1)
 	}
 
 	defer func() {
@@ -465,18 +510,38 @@ func history(c *gin.Context) {
 		tz := session.Get("timezone").(string)
 		loc, _ := time.LoadLocation(tz)
 		path := fmt.Sprintf("users/%s/recently_played", user)
-		iter := firestoreClient.Collection(path).OrderBy("played_at", firestore.Desc).Limit(pageLimit).Documents(ctx)
+		var q firestore.Query
+		if page != "0" {
+			lastPage, _ := c.Cookie("lastPage")
+			if compare(lastPage, page) {
+				if lastDoc, err := c.Cookie("lastDoc"); err == nil {
+					layout := "2006-01-02 15:04:05 -0700 UTC"
+					t, err := time.Parse(layout, lastDoc)
+					if err != nil {
+						log.Println(err.Error())
+					}
+					log.Println(t.Format(layout))
+					q = firestoreClient.Collection(path).OrderBy("played_at", firestore.Desc).
+						StartAfter(t).Limit(pageLimit)
+				}
+			} else {
+				p, _ := strconv.Atoi(page)
+				q = firestoreClient.Collection(path).OrderBy("played_at", firestore.Desc).
+					Offset(pageLimit * p).Limit(pageLimit)
+			}
+		} else {
+			q = firestoreClient.Collection(path).OrderBy("played_at", firestore.Desc).Limit(pageLimit)
+		}
 		var tr firestoreTrack
 		var tracks []firestoreTrack
-		defer iter.Stop()
-		for {
-			doc, err := iter.Next()
-			if err == iterator.Done {
-				break
-			}
-			if err != nil {
-				log.Println(err.Error())
-			}
+		docs, err := q.Documents(ctx).GetAll()
+		if err != nil {
+			log.Println(err.Error())
+		}
+		lastDoc := docs[len(docs)-1].Data()["played_at"].(time.Time)
+		c.SetCookie("lastDoc", lastDoc.String(), 1200, endpoint, "", false, true)
+		c.SetCookie("lastPage", page, 1200, endpoint, "", false, true)
+		for _, doc := range docs {
 			if err := doc.DataTo(&tr); err != nil {
 				log.Println(err.Error())
 			} else {
@@ -488,8 +553,9 @@ func history(c *gin.Context) {
 			http.StatusOK,
 			"history.html",
 			gin.H{
-				"Tracks": tracks,
-				"title":  "Recently Played",
+				"Tracks":     tracks,
+				"title":      "Recently Played",
+				"Navigation": Nav,
 			},
 		)
 	}()
@@ -499,7 +565,7 @@ func history(c *gin.Context) {
 (recently played tracks) [Firestore version]
 recommeded tracks could replace default mood playlist
 or any other (based on passed parameters)
-r=1 - replace, p=[ID]
+r=3 - replace, p=[ID]
 TODO - defaultMoodPlaylistID - create new or store default in DB for user
 */
 func moodFromHistory(c *gin.Context) {
@@ -518,11 +584,11 @@ func moodFromHistory(c *gin.Context) {
 			log.Println(err.Error())
 			c.String(http.StatusNotFound, err.Error())
 		}
-		if replace := c.DefaultQuery("r", replaceCookie); replace == "1" {
+		if replace := c.DefaultQuery("r", replaceCookie); replace == "3" {
 			playlist := c.DefaultQuery("p", playlistCookie)
 			recommendedPlaylistID := spotify.ID(playlist)
 			chunks := chunkIDs(getSpotifyIDs(spotTracks), pageLimit)
-			err = spotifyClient.ReplacePlaylistTracks(recommendedPlaylistID, chunks[0]...)
+			err = spotifyClient.ReplacePlaylistTracks(recommendedPlaylistID, chunks[2]...)
 			if err == nil {
 				log.Println("Tracks added")
 			} else {
@@ -536,7 +602,7 @@ func moodFromHistory(c *gin.Context) {
 			tt.Album = item.Album.Name
 			tt.Artists = joinArtists(item.Artists, ", ")
 			tt.URL = item.ExternalURLs["spotify"]
-			tt.Image = item.Album.Images[1].URL
+			tt.Image = item.Album.Images[0].URL
 			tracks = append(tracks, tt)
 		}
 		c.HTML(
@@ -604,7 +670,7 @@ func tracks(c *gin.Context) {
 			tt.Album = item.Album.Name
 			tt.Artists = joinArtists(item.Artists, ", ")
 			tt.URL = item.ExternalURLs["spotify"]
-			tt.Image = item.Album.Images[1].URL
+			tt.Image = item.Album.Images[0].URL
 			tracks = append(tracks, tt)
 		}
 		c.HTML(
@@ -692,7 +758,7 @@ func albums(c *gin.Context) {
 			al.Name = item.Name
 			al.Artists = joinArtists(item.Artists, ", ")
 			al.URL = item.ExternalURLs["spotify"]
-			al.Image = item.Images[1].URL
+			al.Image = item.Images[0].URL
 			al.Tracks = item.Tracks.Total
 			als = append(als, al)
 		}
@@ -768,15 +834,15 @@ func search(c *gin.Context) {
 	}()
 }
 
-/* recommend songs based on given tracks (maximum 5)
-accepts query parameters t1..t5 with trackIDs.
+/* recommend songs based on given tracks (maximum 7)
+accepts query parameters t3..t5 with trackIDs.
 prints recommended tracks
 */
 func recommend(c *gin.Context) {
 	endpoint := c.Request.URL.Path
-	for i := 1; i < 6; i++ {
+	for i := 3; i < 6; i++ {
 		cookieName := fmt.Sprintf("t%d", i)
-		c.SetCookie(cookieName, c.Query(cookieName), 45, endpoint, "", false, true)
+		c.SetCookie(cookieName, c.Query(cookieName), 47, endpoint, "", false, true)
 		log.Printf("Cookie %s value: %s \n", cookieName, c.Query(cookieName))
 	}
 	client := clientMagic(c)
@@ -787,10 +853,10 @@ func recommend(c *gin.Context) {
 
 	defer func() {
 		trackIDs := []spotify.ID{}
-		for i := 1; i < 6; i++ {
+		for i := 3; i < 6; i++ {
 			cookieName := fmt.Sprintf("t%d", i)
 			if track, err := c.Cookie(cookieName); err == nil {
-				if len(track) > 0 {
+				if len(track) > 2 {
 					trackID := spotify.ID(track)
 					log.Printf("Track cookie %s value: %v \n", cookieName, trackID)
 					trackIDs = appendIfUnique(trackIDs, trackID)
@@ -832,7 +898,7 @@ func recommend(c *gin.Context) {
 /* spot - recommend tracks based on user top artists
 recommeded tracks could replace default mood playlist
 or any other (based on passed parameters)
-r=1 - replace, p=[ID]
+r=3 - replace, p=[ID]
 */
 func spot(c *gin.Context) {
 	endpoint := c.Request.URL.Path
@@ -857,11 +923,11 @@ func spot(c *gin.Context) {
 		}
 		var b strings.Builder
 		b.WriteString("Recommended tracks based on your top artists\n")
-		if replace := c.DefaultQuery("r", replaceCookie); replace == "1" {
+		if replace := c.DefaultQuery("r", replaceCookie); replace == "3" {
 			playlist := c.DefaultQuery("p", playlistCookie)
 			recommendedPlaylistID := spotify.ID(playlist)
 			chunks := chunkIDs(getSpotifyIDs(spotTracks), pageLimit)
-			err = client.ReplacePlaylistTracks(recommendedPlaylistID, chunks[0]...)
+			err = client.ReplacePlaylistTracks(recommendedPlaylistID, chunks[2]...)
 
 			if err == nil {
 				log.Println("Tracks added")
@@ -869,7 +935,7 @@ func spot(c *gin.Context) {
 				log.Println(err)
 			}
 		} else {
-			b.WriteString("Printing only, pass params (r=1, p=playlistID) if you wish to replace with recommended tracks\n")
+			b.WriteString("Printing only, pass params (r=3, p=playlistID) if you wish to replace with recommended tracks\n")
 		}
 		for _, item := range spotTracks {
 			b.WriteString(fmt.Sprintf("  %s - %s : %s (%d)\n", item.ID, item.Name, joinArtists(item.Artists, ", "), item.Popularity))
@@ -883,7 +949,7 @@ func spot(c *gin.Context) {
 (recently played tracks)
 recommeded tracks could replace default mood playlist
 or any other (based on passed parameters)
-r=1 - replace, p=[ID]
+r=3 - replace, p=[ID]
 NOT USED - we are using moodFromHistory as handler
 */
 // func mood(c *gin.Context) {
@@ -909,10 +975,10 @@ NOT USED - we are using moodFromHistory as handler
 // 		}
 // 		replace := c.DefaultQuery("r", replaceCookie)
 // 		playlist := c.DefaultQuery("p", playlistCookie)
-// 		if replace == "1" {
+// 		if replace == "3" {
 // 			recommendedPlaylistID := spotify.ID(playlist)
 // 			chunks := chunkIDs(getSpotifyIDs(spotTracks), pageLimit)
-// 			err = client.ReplacePlaylistTracks(recommendedPlaylistID, chunks[0]...)
+// 			err = client.ReplacePlaylistTracks(recommendedPlaylistID, chunks[2]...)
 // 			if err == nil {
 // 				log.Println("Tracks added")
 // 			} else {
@@ -926,7 +992,7 @@ NOT USED - we are using moodFromHistory as handler
 // 			tt.Album = item.Album.Name
 // 			tt.Artists = joinArtists(item.Artists, ", ")
 // 			tt.URL = item.ExternalURLs["spotify"]
-// 			tt.Image = item.Album.Images[1].URL
+// 			tt.Image = item.Album.Images[3].URL
 // 			tracks = append(tracks, tt)
 // 		}
 // 		c.HTML(

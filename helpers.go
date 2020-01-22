@@ -215,12 +215,12 @@ func miniAudioFeatures(ids []spotify.ID, spotifyClient *spotify.Client) *[]audio
 	}
 	return &audioTracks
 }
-func miniTrackAttributes(chunk int, ids []spotify.ID, spotifyClient *spotify.Client) *[]audioTrack {
+func miniTrackAttributes(ids []spotify.ID, spotifyClient *spotify.Client) *[]audioTrack {
 	var f audioTrack
 	var audioTracks []audioTrack
 	chunks := chunkIDs(ids, pageLimit)
-	audioFeatures, _ := spotifyClient.GetAudioFeatures(chunks[chunk]...) // GetAudioFeatures has variadic argument
-	fullTracks, _ := fullTrackGetMany(spotifyClient, chunks[chunk])
+	audioFeatures, _ := spotifyClient.GetAudioFeatures(chunks[0]...) // GetAudioFeatures has variadic argument
+	fullTracks, _ := fullTrackGetMany(spotifyClient, chunks[0])
 	for i, res := range audioFeatures {
 		if res.ID != fullTracks[i].ID {
 			log.Println("miniAudioFeatures: NOT IN SYNC")

@@ -65,7 +65,7 @@ func init() {
 		// HTML pages
 		authorized.GET("/top", top)
 		authorized.GET("/popular", popular)
-		authorized.GET("/chart", analysis)
+		authorized.GET("/chart", dots)
 		authorized.GET("/history", history)
 		authorized.GET("/mood", moodFromHistory)
 		authorized.GET("/user", user)
