@@ -33,11 +33,6 @@ type popularTrack struct {
 	Count int `firestore:"count,omitempty"`
 }
 
-type navigation struct {
-	Previous string
-	Next     string
-}
-
 // TODO - its just tracks now, not topTracks
 type topTrack struct {
 	Count   int

@@ -21,6 +21,11 @@ type timeZones struct {
 	Time string   `json:"time"`
 	Zone []string `json:"zone"`
 }
+type navigation struct {
+	Previous string
+	Current  string
+	Next     string
+}
 
 /*getTime fetches the contents of the given URL and decodes it as JSON
 into the given result, which should be a pointer to the expected data.
@@ -359,10 +364,12 @@ func getNavigation(page string) *navigation {
 	var nav navigation
 	if page == "" || page == "0" {
 		nav.Previous = ""
+		nav.Current = "0"
 		nav.Next = "1"
 	} else {
 		chunk, _ := strconv.Atoi(page)
 		nav.Previous = strconv.Itoa(chunk - 1)
+		nav.Current = strconv.Itoa(chunk)
 		nav.Next = strconv.Itoa(chunk + 1)
 	}
 	return &nav

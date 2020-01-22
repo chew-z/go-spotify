@@ -9,12 +9,29 @@
 <!-- </p> -->
 <h4 class="display-4">{{ .title }}</h4>
 <div class="container">
-<ul class="pagination justify-content-end">
+<nav aria-label="Page navigation example">
     {{ with .Navigation }}
-    <li class="page-item"><a class="page-link" href="/history?page={{ .Previous }}">Previous</a></li>
-    <li class="page-item"><a class="page-link" href="/history?page={{ .Next }}">Next</a></li>
+  <ul class="pagination justify-content-end">
+      <li class="page-item {{ if not .Previous }}disabled{{ end}}">
+        <a class="page-link" href="/history?page={{ .Previous }}" aria-label="Previous">
+        <span aria-hidden="true">&laquo;</span>
+        <span class="sr-only">Previous</span>
+      </a>
+    </li>
+    {{ if .Previous }}
+    <li class="page-item"><a class="page-link" href="/history?page={{ .Previous }}">{{ .Previous }}</a></li>
     {{ end }}
-</ul>
+    <li class="page-item"><a class="page-link" href="/history?page={{ .Current }}">{{ .Current }}</a></li>
+    <li class="page-item"><a class="page-link" href="/history?={{ .Next }}">{{ .Next }}</a></li>
+    <li class="page-item">
+        <a class="page-link" href="/history?page={{ .Next }}" aria-label="Next">
+        <span aria-hidden="true">&raquo;</span>
+        <span class="sr-only">Next</span>
+      </a>
+    </li>
+  </ul>
+    {{ end }}
+</nav>
 </div>
 <div class="container">
     {{range .Tracks }}
@@ -25,5 +42,31 @@
     </div>
     {{end}}
 </div>
+<div class="container">
+<nav aria-label="Page navigation example">
+    {{ with .Navigation }}
+  <ul class="pagination justify-content-end">
+      <li class="page-item {{ if not .Previous }}disabled{{ end}}">
+        <a class="page-link" href="/history?page={{ .Previous }}" aria-label="Previous">
+        <span aria-hidden="true">&laquo;</span>
+        <span class="sr-only">Previous</span>
+      </a>
+    </li>
+    {{ if .Previous }}
+    <li class="page-item"><a class="page-link" href="/history?page={{ .Previous }}">{{ .Previous }}</a></li>
+    {{ end }}
+    <li class="page-item"><a class="page-link" href="/history?page={{ .Current }}">{{ .Current }}</a></li>
+    <li class="page-item"><a class="page-link" href="/history?={{ .Next }}">{{ .Next }}</a></li>
+    <li class="page-item">
+        <a class="page-link" href="/history?page={{ .Next }}" aria-label="Next">
+        <span aria-hidden="true">&raquo;</span>
+        <span class="sr-only">Next</span>
+      </a>
+    </li>
+  </ul>
+    {{ end }}
+</nav>
+</div>
+
 <!--Embed the footer.html template at this location-->
 {{ template "footer.html" .}}
