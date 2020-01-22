@@ -381,20 +381,12 @@ func analysis(c *gin.Context) {
 func dots(c *gin.Context) {
 	endpoint := c.Request.URL.Path
 	page := c.Query("page")
-	var Nav navigation
-	if page == "" || page == "0" {
-		Nav.Previous = ""
-		Nav.Next = "1"
-	} else {
-		chunk, _ := strconv.Atoi(page)
-		Nav.Previous = strconv.Itoa(chunk - 1)
-		Nav.Next = strconv.Itoa(chunk + 1)
-	}
 	analysisCookie, err := c.Cookie("analysis_type")
 	if err != nil {
 		c.SetCookie("analysis_type", c.DefaultQuery("t", "history"), cookieLifetime, endpoint, "", false, true)
 	}
 	log.Printf("Parameters values: %s %s \n", analysisCookie, page)
+	nav := getNavigation(page)
 
 	spotifyClient := clientMagic(c)
 	if spotifyClient == nil {
@@ -412,27 +404,7 @@ func dots(c *gin.Context) {
 			user = string(u.ID)
 		}
 		path := fmt.Sprintf("users/%s/recently_played", user)
-		var q firestore.Query
-		if page != "0" {
-			lastPage, _ := c.Cookie("lastPage")
-			if compare(lastPage, page) {
-				if lastDoc, err := c.Cookie("lastDoc"); err == nil {
-					layout := "2006-01-02 15:04:05 -0700 UTC"
-					t, err := time.Parse(layout, lastDoc)
-					if err != nil {
-						log.Println(err.Error())
-					}
-					q = firestoreClient.Collection(path).OrderBy("played_at", firestore.Desc).
-						StartAfter(t).Limit(pageLimit)
-				}
-			} else {
-				p, _ := strconv.Atoi(page)
-				q = firestoreClient.Collection(path).OrderBy("played_at", firestore.Desc).
-					Offset(pageLimit * p).Limit(pageLimit)
-			}
-		} else {
-			q = firestoreClient.Collection(path).OrderBy("played_at", firestore.Desc).Limit(pageLimit)
-		}
+		q := paginateHistory(page, path, c)
 		docs, err := q.Documents(ctx).GetAll()
 		if err != nil {
 			log.Println(err.Error())
@@ -452,28 +424,14 @@ func dots(c *gin.Context) {
 		}
 		c.HTML(
 			http.StatusOK,
-			"pie.html",
+			"pie.html", //TODO - pie or radar
 			gin.H{
 				"title":      "Chart",
-				"Navigation": Nav,
+				"Navigation": nav,
 				"Data":       data,
 			},
 		)
 	}
-}
-func compare(a string, b string) bool {
-	i, err := strconv.Atoi(a)
-	if err != nil {
-		i = 0
-	}
-	j, err := strconv.Atoi(b)
-	if err != nil {
-		j = 0
-	}
-	if i < j {
-		return true
-	}
-	return false
 }
 
 /* history - read saved tracks from Cloud Firestore database
@@ -486,16 +444,7 @@ func history(c *gin.Context) {
 		return
 	}
 	page := c.Query("page")
-	var Nav navigation
-	if page == "" || page == "0" {
-		page = "0"
-		Nav.Previous = ""
-		Nav.Next = "1"
-	} else {
-		chunk, _ := strconv.Atoi(page)
-		Nav.Previous = strconv.Itoa(chunk - 1)
-		Nav.Next = strconv.Itoa(chunk + 1)
-	}
+	nav := getNavigation(page)
 
 	defer func() {
 		session := sessions.Default(c)
@@ -510,30 +459,7 @@ func history(c *gin.Context) {
 		tz := session.Get("timezone").(string)
 		loc, _ := time.LoadLocation(tz)
 		path := fmt.Sprintf("users/%s/recently_played", user)
-		var q firestore.Query
-		if page != "0" {
-			lastPage, _ := c.Cookie("lastPage")
-			if compare(lastPage, page) {
-				if lastDoc, err := c.Cookie("lastDoc"); err == nil {
-					layout := "2006-01-02 15:04:05 -0700 UTC"
-					t, err := time.Parse(layout, lastDoc)
-					if err != nil {
-						log.Println(err.Error())
-					}
-					log.Println(t.Format(layout))
-					q = firestoreClient.Collection(path).OrderBy("played_at", firestore.Desc).
-						StartAfter(t).Limit(pageLimit)
-				}
-			} else {
-				p, _ := strconv.Atoi(page)
-				q = firestoreClient.Collection(path).OrderBy("played_at", firestore.Desc).
-					Offset(pageLimit * p).Limit(pageLimit)
-			}
-		} else {
-			q = firestoreClient.Collection(path).OrderBy("played_at", firestore.Desc).Limit(pageLimit)
-		}
-		var tr firestoreTrack
-		var tracks []firestoreTrack
+		q := paginateHistory(page, path, c)
 		docs, err := q.Documents(ctx).GetAll()
 		if err != nil {
 			log.Println(err.Error())
@@ -541,6 +467,8 @@ func history(c *gin.Context) {
 		lastDoc := docs[len(docs)-1].Data()["played_at"].(time.Time)
 		c.SetCookie("lastDoc", lastDoc.String(), 1200, endpoint, "", false, true)
 		c.SetCookie("lastPage", page, 1200, endpoint, "", false, true)
+		var tr firestoreTrack
+		var tracks []firestoreTrack
 		for _, doc := range docs {
 			if err := doc.DataTo(&tr); err != nil {
 				log.Println(err.Error())
@@ -555,7 +483,7 @@ func history(c *gin.Context) {
 			gin.H{
 				"Tracks":     tracks,
 				"title":      "Recently Played",
-				"Navigation": Nav,
+				"Navigation": nav,
 			},
 		)
 	}()

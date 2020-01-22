@@ -7,9 +7,11 @@ import (
 	"math"
 	"net/http"
 	"reflect"
+	"strconv"
 	"strings"
 	"time"
 
+	"cloud.google.com/go/firestore"
 	spotify "github.com/chew-z/spotify"
 	"github.com/gin-gonic/gin"
 	"google.golang.org/api/iterator"
@@ -324,4 +326,63 @@ func searchType(a string) spotify.SearchType {
 	default:
 		return spotify.SearchTypeTrack
 	}
+}
+func paginateHistory(page string, path string, c *gin.Context) *firestore.Query {
+	var q firestore.Query
+	if page != "0" {
+		lastPage, _ := c.Cookie("lastPage")
+		if gtString(lastPage, page) {
+			if lastDoc, err := c.Cookie("lastDoc"); err == nil {
+				layout := "2006-01-02 15:04:05 -0700 UTC"
+				t, err := time.Parse(layout, lastDoc)
+				if err != nil {
+					log.Println(err.Error())
+				}
+				q = firestoreClient.Collection(path).OrderBy("played_at", firestore.Desc).
+					StartAfter(t).Limit(pageLimit)
+			}
+		} else {
+			p, _ := strconv.Atoi(page)
+			q = firestoreClient.Collection(path).OrderBy("played_at", firestore.Desc).
+				Offset(pageLimit * p).Limit(pageLimit)
+		}
+	} else {
+		q = firestoreClient.Collection(path).OrderBy("played_at", firestore.Desc).Limit(pageLimit)
+	}
+	return &q
+}
+
+/*navigation - return navigation object to page
+- scrolling multi-page results
+*/
+func getNavigation(page string) *navigation {
+	var nav navigation
+	if page == "" || page == "0" {
+		nav.Previous = ""
+		nav.Next = "1"
+	} else {
+		chunk, _ := strconv.Atoi(page)
+		nav.Previous = strconv.Itoa(chunk - 1)
+		nav.Next = strconv.Itoa(chunk + 1)
+	}
+	return &nav
+}
+
+/*gtString - this liitle function wraps comparision
+of two numbers passed as a string. Returns true if
+first argument is larger then second.
+*/
+func gtString(a string, b string) bool {
+	i, err := strconv.Atoi(a)
+	if err != nil {
+		i = 0
+	}
+	j, err := strconv.Atoi(b)
+	if err != nil {
+		j = 0
+	}
+	if i < j {
+		return true
+	}
+	return false
 }
