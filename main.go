@@ -29,13 +29,16 @@ func main() {
 }
 
 func init() {
-	if gcr == "YES" {
-		log.Printf("Project ID: %s, service account email: %s", getProjectID(), getAccountEmail())
-		// log.Panic("GOOGLE_CLOUD_PROJECT must be set")
-	}
-	if checkNet() {
-		log.Fatal("THERE IS NOTHING we can do without access to internet")
-	}
+	// Do some lazy initialization to speed up cold start
+	go func() {
+		if gcr == "YES" {
+			log.Printf("Project ID: %s, service account email: %s", getProjectID(), getAccountEmail())
+			// log.Panic("GOOGLE_CLOUD_PROJECT must be set")
+		}
+		if checkNet() {
+			log.Fatal("THERE IS NOTHING we can do without access to internet")
+		}
+	}()
 
 	firestoreClient = initFirestoreDatabase(ctx)
 	store := sessions.NewCookieStore([]byte(sessionSecret))
@@ -43,11 +46,11 @@ func init() {
 	router := gin.Default()
 	router.Use(sessions.Sessions("go-spotify", store))
 
-	router.Static("/static", "./static")
-	router.StaticFile("/favicon.ico", "./favicon.ico")
 	// Process the templates at the start so that they don't have to be loaded
 	// from the disk again. This makes serving HTML pages very fast.
 	router.LoadHTMLGlob("templates/*")
+	router.Static("/static", "./static")
+	router.StaticFile("/favicon.ico", "./favicon.ico")
 
 	router.GET("/", func(c *gin.Context) {
 		c.HTML(http.StatusOK, "main.html", gin.H{})
@@ -55,13 +58,12 @@ func init() {
 	router.GET("/callback", callback)
 	router.GET("/login", login)
 
+	// Custom domain middleware
 	router.Use(Redirector()) // middleware works for endpoints below
-
+	// Authorization middleware
 	authorized := router.Group("/")
 	authorized.Use(AuthenticationRequired("/user"))
 	{
-		// moved to Cloud Function
-		// authorized.POST("/recent", recent)
 		// HTML pages
 		authorized.GET("/top", top)
 		authorized.GET("/popular", popular)

@@ -1,9 +1,9 @@
 {
   "name": "music.suka.yoga",
-  "short_name": "music.suka.yoga",
+  "short_name": "music",
   "description": "Spotify companion app for better music discovery and analysis.",
   "categories": ["music"],
-  "start_url": "https://music.suka.yoga/user",
+  "start_url": "https://music.suka.yoga/",
   "lang": "en-US",
   "scope": "https://music.suka.yoga/",
   "icons": [
