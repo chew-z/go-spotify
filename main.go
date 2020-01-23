@@ -33,10 +33,9 @@ func init() {
 	go func() {
 		if gcr == "YES" {
 			log.Printf("Project ID: %s, service account email: %s", getProjectID(), getAccountEmail())
-			// log.Panic("GOOGLE_CLOUD_PROJECT must be set")
 		}
 		if checkNet() {
-			log.Fatal("THERE IS NOTHING we can do without access to internet")
+			log.Println("THERE IS NOTHING we can do without access to internet")
 		}
 	}()
 
@@ -55,7 +54,9 @@ func init() {
 	router.StaticFile("/apple-touch-icon-precomposed.png", "./static/apple-touch-icon-precomposed.png")
 
 	router.GET("/", func(c *gin.Context) {
-		c.HTML(http.StatusOK, "main.html", gin.H{})
+		c.HTML(http.StatusOK, "main.html", gin.H{
+			"title": "music.suka.yoga",
+		})
 	})
 	router.GET("/callback", callback)
 	router.GET("/login", login)
