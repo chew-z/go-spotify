@@ -89,7 +89,7 @@ retrieving token from Firestore and creating new client (slow)
 */
 func clientMagic(c *gin.Context) *spotify.Client {
 	endpoint := c.Request.URL.Path
-	var client *spotify.Client
+	var spotifyClient *spotify.Client
 	session := sessions.Default(c)
 	// we are past authorization middleware so session
 	// variables should not be nil and we can safely cast
@@ -100,9 +100,9 @@ func clientMagic(c *gin.Context) *spotify.Client {
 	log.Printf("/clientMagic: session id: %s", uuid)
 	// If the session is running Spotify client is probably cached
 	if gClient, foundClient := kaszka.Get(uuid); foundClient {
-		client = gClient.(*spotify.Client)
-		kaszka.SetDefault(uuid, client) // replace existing
-		return client
+		spotifyClient = gClient.(*spotify.Client)
+		kaszka.SetDefault(uuid, spotifyClient) // replace existing
+		return spotifyClient
 	}
 	log.Printf("%s: Cached client NOT found for: %s", endpoint, uuid)
 	// if client isn't in cache get token from database (user should be logged in and Spotify token saved)

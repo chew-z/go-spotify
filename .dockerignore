@@ -6,6 +6,7 @@ README.md
 *.sh
 *.bak
 *.bak.go
+*.go.orig
 CloudFunctions/**
 spotify.txt
 token.json

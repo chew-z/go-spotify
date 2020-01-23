@@ -8,6 +8,7 @@ token.json
 init.sh
 *.bak
 *.bak.go
+*.go.orig
 spotify.txt
 auth-gin.go
 auth-gin-cache.go

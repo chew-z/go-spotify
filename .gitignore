@@ -10,4 +10,5 @@ bin/**
 .env.yaml
 *.bak
 *.bak.go
+*.go.orig
 spotify.txt
