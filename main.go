@@ -48,6 +48,7 @@ func init() {
 	// Process the templates at the start so that they don't have to be loaded
 	// from the disk again. This makes serving HTML pages very fast.
 	router.LoadHTMLGlob("templates/*")
+	router.Use(Headers()) // Custom headers middleware
 	router.Static("/static", "./static")
 	router.StaticFile("/favicon.ico", "./favicon.ico")
 	router.StaticFile("/apple-touch-icon.png", "./static/apple-touch-icon.png")
@@ -85,6 +86,5 @@ func init() {
 		authorized.GET("/search", search)
 		authorized.GET("/recommend", recommend)
 	}
-
 	router.Run()
 }

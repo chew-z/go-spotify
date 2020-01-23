@@ -249,6 +249,7 @@ func popular(c *gin.Context) {
 func charts(c *gin.Context) {
 	endpoint := c.Request.URL.Path
 	page := c.Query("page")
+	chart := c.DefaultQuery("chart", "pie.html")
 	nav := getNavigation(page)
 
 	spotifyClient := clientMagic(c)
@@ -287,7 +288,7 @@ func charts(c *gin.Context) {
 		}
 		c.HTML(
 			http.StatusOK,
-			"pie.html", //TODO - pie or radar
+			chart, //TODO - pie or radar
 			gin.H{
 				"title":      "Chart",
 				"Navigation": nav,

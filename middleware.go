@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 )
@@ -25,6 +26,18 @@ func Redirector() gin.HandlerFunc {
 					c.Abort()
 				}()
 			}
+		}
+	}
+}
+
+/*Headers - middleware for adding custom
+headers - also by path
+*/
+func Headers() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.Header("Service-Worker-Allowed", "/")
+		if strings.HasPrefix(c.Request.RequestURI, "/static/") {
+			c.Header("Cache-Control", "max-age=86400")
 		}
 	}
 }

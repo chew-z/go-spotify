@@ -3,13 +3,13 @@
 <!--Embed the header.html template at this location-->
 {{ template "header.html" .}}
 <!-- TODO Move scripts to template -->
-<!-- <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script> -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.9.3/Chart.bundle.min.js" integrity="sha256-TQq84xX6vkwR0Qs1qH5ADkP+MvH0W+9E7TdHJsoIQiM=" crossorigin="anonymous"></script>
 <script src="https://www.chartjs.org/samples/latest/utils.js"></script>
+
 <h4 class="display-4">{{ .title }}</h4>
 
 <div class="container">
-<nav aria-label="Page navigation example">
+<nav aria-label="Page navigation">
     {{ with .Navigation }}
   <ul class="pagination justify-content-end">
       <li class="page-item {{ if not .Previous }}disabled{{ end}}">
@@ -32,12 +32,16 @@
   </ul>
     {{ end }}
 </nav>
-<!-- <ul class="pagination justify-content-end"> -->
-<!--     {{ with .Navigation }} -->
-<!--     <li class="page-item"><a class="page-link" href="/chart?page={{ .Previous }}">Previous</a></li> -->
-<!--     <li class="page-item"><a class="page-link" href="/chart?page={{ .Next }}">Next</a></li> -->
-<!--     {{ end }} -->
-<!-- </ul> -->
+</div>
+<div class="container d-flex justify-content-end">
+<script>
+function addUrlParameter(name, value) {
+  var searchParams = new URLSearchParams(window.location.search)
+  searchParams.set(name, value)
+  window.location.search = searchParams.toString()
+}
+</script>
+<a onclick="addUrlParameter('chart', 'radar.html')" class="btn btn-light btn-sm btn-lg active" role="button" aria-pressed="true">Radar</a>
 </div>
 
 <div class="container">
