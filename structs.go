@@ -14,21 +14,25 @@ type firestoreTrack struct {
 	ID       string    `firestore:"id,omitempty"`
 }
 
+// TODO - used only once
+type popularTrack struct {
+	Count int `firestore:"count,omitempty"`
+}
+
 // the name - this is what we need to
 // retrieve token form firestore and for some
 //initialization
 type firestoreToken struct {
-	user     string        // Spotify user ID
-	country  string        // The country of the user, as set in the user's account profile
-	timezone string        // TODO let user set timezone
-	path     string        // authorization path (gin routes group)
-	token    *oauth2.Token // Spotify token
+	user    string        // Spotify user ID
+	country string        // The country of the user, as set in the user's account profile
+	path    string        // authorization path (gin routes group)
+	token   *oauth2.Token // Spotify token
 }
 
-type timeZones struct {
-	Time string   `json:"time"`
-	Zone []string `json:"zone"`
-}
+// type timeZones struct {
+// 	Time string   `json:"time"`
+// 	Zone []string `json:"zone"`
+// }
 
 type navigation struct {
 	Previous string
@@ -41,11 +45,6 @@ type recommendationParameters struct {
 	TrackAttributes *spotify.TrackAttributes
 	FromYear        int
 	MinTrackCount   int
-}
-
-// TODO - used only once
-type popularTrack struct {
-	Count int `firestore:"count,omitempty"`
 }
 
 // TODO - its just tracks now, not topTracks

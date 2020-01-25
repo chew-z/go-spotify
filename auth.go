@@ -52,7 +52,7 @@ func AuthenticationRequired(authPath string) gin.HandlerFunc {
 		// if user is set in session authPath and uuid should be (casting to string will fail terribly if nil)
 		userString := user.(string)
 		if path := session.Get("authPath").(string); path == authPath {
-			log.Printf("/auth: Seems like we are legit as user %s for routes group %s: ", userString, authPath)
+			// log.Printf("/auth: Seems like we are legit as user %s for routes group %s: ", userString, authPath)
 		}
 		uuid := session.Get("uuid").(string)
 		// var client *spotify.Client
@@ -61,6 +61,7 @@ func AuthenticationRequired(authPath string) gin.HandlerFunc {
 			// client = gclient.(*spotify.Client)
 			// kaszka.Add(uuid, &client, cache.DefaultExpiration) //Add is like Set or refresh
 		} else { // and if there is no client in cache we get token from Firestore
+			location, _ := time.LoadLocation("Europe/Warsaw")
 			log.Printf("/auth: Cached client NOT found for: %s", uuid)
 			// create client and put it in cache
 			var newTok firestoreToken
@@ -97,7 +98,7 @@ func clientMagic(c *gin.Context) *spotify.Client {
 	uuid := session.Get("uuid").(string)
 	userString := session.Get("user").(string)
 	authPath := session.Get("authPath").(string)
-	log.Printf("/clientMagic: session id: %s", uuid)
+	// log.Printf("/clientMagic: session id: %s", uuid)
 	// If the session is running Spotify client is probably cached
 	if gClient, foundClient := kaszka.Get(uuid); foundClient {
 		spotifyClient = gClient.(*spotify.Client)
@@ -114,6 +115,7 @@ func clientMagic(c *gin.Context) *spotify.Client {
 		log.Printf("Couldn't find token for %s", newTok.path)
 		return nil
 	}
+	location, _ := time.LoadLocation("Europe/Warsaw")
 	log.Printf("/clientMagic: Token in Firestore expires at: %s", tok.Expiry.In(location).Format("15:04:05"))
 	newClient := auth.NewClient(tok)
 	// if an item doesn't already exist for the given key, or if the existing item has expired
@@ -134,6 +136,7 @@ func getTokenFromDB(token *firestoreToken) (*oauth2.Token, error) {
 	tok := &oauth2.Token{}
 	dsnap.DataTo(tok)
 	token.token = tok // here token is set by reference and also returned in input parameter
+	location, _ := time.LoadLocation("Europe/Warsaw")
 	log.Printf("getTokenFromDB: Got token with expiration %s", tok.Expiry.In(location).Format("15:04:05"))
 	return tok, nil
 }
@@ -146,13 +149,13 @@ func saveTokenToDB(token *firestoreToken) {
 	// TODO - two set operations - ?
 	_, err := firestoreClient.Doc(path).Set(ctx, token.token)
 	_, err = firestoreClient.Collection("users").Doc(token.user).Set(ctx, map[string]interface{}{
-		"userID":   token.user,
-		"country":  token.country,
-		"timezone": token.timezone,
+		"userID":  token.user,
+		"country": token.country,
 	}, firestore.MergeAll)
 	if err != nil {
 		log.Printf("saveToken: Error saving token for %s %s", token.path, err.Error())
 	} else {
+		location, _ := time.LoadLocation("Europe/Warsaw")
 		log.Printf("saveToken: Saved token for %s into Firestore", token.path)
 		log.Printf("saveToken: Token expiration %s", token.token.Expiry.In(location).Format("15:04:05"))
 	}
@@ -173,6 +176,7 @@ func updateTokenInDB(token *firestoreToken) {
 	if err != nil {
 		log.Printf("updateToken: Error saving token for %s %s", path, err.Error())
 	} else {
+		location, _ := time.LoadLocation("Europe/Warsaw")
 		log.Printf("updateToken: Saved token for %s into Firestore", path)
 		log.Printf("updateToken: Token expiration %s", token.token.Expiry.In(location).Format("15:04:05"))
 	}

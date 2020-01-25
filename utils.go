@@ -1,11 +1,9 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"log"
 	"math"
-	"net/http"
 	"reflect"
 	"strconv"
 	"strings"
@@ -14,62 +12,7 @@ import (
 	"cloud.google.com/go/firestore"
 	spotify "github.com/chew-z/spotify"
 	"github.com/gin-gonic/gin"
-	"google.golang.org/api/iterator"
 )
-
-/*getTime fetches the contents of the given URL and decodes it as JSON
-into the given result, which should be a pointer to the expected data.
-*/
-func getTime(url string) (*timeZones, error) {
-	var result timeZones
-	result.Time = time.Now().In(location).Format("15:04:05")
-	result.Zone = append(result.Zone, timezone)
-	if gae != "" || gcr == "YES" {
-		token := getJWToken(timezonesURL)
-		if token != "" {
-			// if verifyToken(timezonesURL, token) {
-			req, err := http.NewRequest("GET", url, nil)
-			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", token))
-			req.Header.Add("content-type", "application/json")
-			resp, err := http.DefaultClient.Do(req)
-			if err != nil {
-				return &result, err
-			}
-			err = json.NewDecoder(resp.Body).Decode(&result)
-			if err != nil {
-				return &result, fmt.Errorf("cannot decode JSON: %v", err)
-			}
-			// }
-		}
-	}
-	return &result, nil
-}
-
-/*getUserLocation - on AppEngine it is getting City, lat/lon
-from AppEngine-specific request headers and using microservice
-to get timezone from lat/lon
-*/
-// func getUserLocation(c *gin.Context) *userLocation {
-// 	var loc userLocation
-
-// 	loc.City = strings.Title(c.Request.Header.Get("X-AppEngine-City"))
-// 	if loc.City == "?" {
-// 		loc.City = ""
-// 	}
-// 	latlon := c.Request.Header.Get("X-AppEngine-CityLatLong")
-// 	if latlon != "" {
-// 		ll := strings.Split(latlon, ",")
-// 		loc.Lat = ll[0]
-// 		loc.Lon = ll[1]
-// 	}
-// 	url := fmt.Sprintf("%s?lat=%s&lon=%s", timezonesURL, loc.Lat, loc.Lon)
-// 	tzResponse, err := getTime(url)
-// 	if err == nil && gcr == "YES" {
-// 		loc.Tz = tzResponse.Zone[0]
-// 		loc.Time = tzResponse.Time
-// 	}
-// 	return &loc
-// }
 
 /*getRecommendedTracks - gets recommendation based on seed
  */
@@ -200,32 +143,6 @@ func getSpotifyIDs(input interface{}) []spotify.ID {
 	}
 
 	return ids
-}
-
-/*getTimezones - returns timezones for the country
-we keep collection 'timezones' just for that
-*/
-func getTimeZones(country string) ([]string, error) {
-	type timeZone struct {
-		Country  string
-		Timezone string
-	}
-	var tz timeZone
-	var timezones []string
-	iter := firestoreClient.Collection("timezones").Where("Country", "==", country).Documents(ctx)
-	defer iter.Stop()
-	for {
-		doc, err := iter.Next()
-		if err == iterator.Done {
-			break
-		}
-		if err != nil {
-			return nil, err
-		}
-		doc.DataTo(&tz)
-		timezones = append(timezones, tz.Timezone)
-	}
-	return timezones, nil
 }
 
 func getItemPropertyValue(input interface{}, fieldName string) []interface{} {

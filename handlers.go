@@ -26,10 +26,7 @@ const (
 )
 
 var (
-	countryPoland = "PL"
-	timezone      = "Europe/Warsaw"
-	location, _   = time.LoadLocation(timezone)
-	kaszka        = cache.New(20*time.Minute, 3*time.Minute)
+	kaszka = cache.New(20*time.Minute, 3*time.Minute)
 	// Warning token will fail if you are changing scope (even if you narrow it down) so you might end up with bunch
 	// of useless stored tokens that will keep failing
 	// TODO - procedure for clearing useless token (users will have to re-authorize with Spotify)
@@ -99,11 +96,6 @@ func login(c *gin.Context) {
 		var newTok firestoreToken
 		newTok.user = string(user.ID)
 		newTok.country = string(user.Country)
-		tz, err := getTimeZones(string(user.Country))
-		if err == nil {
-			timezone = tz[0] // TODO - this will work for small countries, for Russia, US let user decide
-		}
-		newTok.timezone = timezone
 		newTok.path = endpoint
 		newTok.token = newToken
 		saveTokenToDB(&newTok)
@@ -112,7 +104,6 @@ func login(c *gin.Context) {
 		log.Printf("/login: %s from %s", string(user.ID), string(user.Country))
 		session.Set("user", string(user.ID))
 		session.Set("country", string(user.Country))
-		session.Set("timezone", timezone)
 		session.Set("authPath", endpoint)
 		session.Set("uuid", uuid)
 		if err := session.Save(); err != nil {
@@ -321,8 +312,8 @@ func history(c *gin.Context) {
 			}
 			user = string(u.ID)
 		}
-		tz := session.Get("timezone").(string)
-		loc, _ := time.LoadLocation(tz)
+		// tz := session.Get("timezone").(string)
+		// loc, _ := time.LoadLocation(tz)
 		path := fmt.Sprintf("users/%s/recently_played", user)
 		q := paginateHistory(page, path, c)
 		docs, err := q.Documents(ctx).GetAll()
@@ -338,7 +329,6 @@ func history(c *gin.Context) {
 			if err := doc.DataTo(&tr); err != nil {
 				log.Println(err.Error())
 			} else {
-				tr.PlayedAt = tr.PlayedAt.In(loc) // adjust displayed time to users's location
 				tracks = append(tracks, tr)
 			}
 		}
@@ -387,6 +377,7 @@ func moodFromHistory(c *gin.Context) {
 			} else {
 				log.Println(err.Error())
 			}
+			location, _ := time.LoadLocation("Europe/Warsaw") // TODO
 			playlist, err := spotifyClient.CreatePlaylistForUser(
 				user.ID,
 				fmt.Sprintf("Mood %s", time.Now().In(location).Format("Monday Jan _2 15:04")),
@@ -444,10 +435,7 @@ func moodFromHistory(c *gin.Context) {
 func user(c *gin.Context) {
 	spotifyClient := clientMagic(c)
 	var User userLocation
-	// Loc := getUserLocation(c) // TODO - it is slowing down a lot and is not useful without appengine. Lets user select.
-	// log.Printf("city: %s, lat: %s, lon: %s, timezone: %s, time: %s", Loc.City, Loc.Lat, Loc.Lon, Loc.Tz, Loc.Time)
 	if spotifyClient != nil {
-		// use the client to make calls that require authorization
 		user, err := spotifyClient.CurrentUser()
 		if err != nil {
 			log.Println(err.Error())

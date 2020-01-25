@@ -1,11 +1,12 @@
 README.md
 .gitignore
-go.sum
+.git/**
 bin/**
 CloudFunctions/**
 token.json
 init.sh
 gcrgc.sh
+go.sum
 *.bak
 *.bak.go
 *.go.orig
