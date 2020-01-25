@@ -49,27 +49,27 @@ func getTime(url string) (*timeZones, error) {
 from AppEngine-specific request headers and using microservice
 to get timezone from lat/lon
 */
-func getUserLocation(c *gin.Context) *userLocation {
-	var loc userLocation
+// func getUserLocation(c *gin.Context) *userLocation {
+// 	var loc userLocation
 
-	loc.City = strings.Title(c.Request.Header.Get("X-AppEngine-City"))
-	if loc.City == "?" {
-		loc.City = ""
-	}
-	latlon := c.Request.Header.Get("X-AppEngine-CityLatLong")
-	if latlon != "" {
-		ll := strings.Split(latlon, ",")
-		loc.Lat = ll[0]
-		loc.Lon = ll[1]
-	}
-	url := fmt.Sprintf("%s?lat=%s&lon=%s", timezonesURL, loc.Lat, loc.Lon)
-	tzResponse, err := getTime(url)
-	if err == nil && gcr == "YES" {
-		loc.Tz = tzResponse.Zone[0]
-		loc.Time = tzResponse.Time
-	}
-	return &loc
-}
+// 	loc.City = strings.Title(c.Request.Header.Get("X-AppEngine-City"))
+// 	if loc.City == "?" {
+// 		loc.City = ""
+// 	}
+// 	latlon := c.Request.Header.Get("X-AppEngine-CityLatLong")
+// 	if latlon != "" {
+// 		ll := strings.Split(latlon, ",")
+// 		loc.Lat = ll[0]
+// 		loc.Lon = ll[1]
+// 	}
+// 	url := fmt.Sprintf("%s?lat=%s&lon=%s", timezonesURL, loc.Lat, loc.Lon)
+// 	tzResponse, err := getTime(url)
+// 	if err == nil && gcr == "YES" {
+// 		loc.Tz = tzResponse.Zone[0]
+// 		loc.Time = tzResponse.Time
+// 	}
+// 	return &loc
+// }
 
 /*getRecommendedTracks - gets recommendation based on seed
  */

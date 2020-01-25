@@ -443,7 +443,7 @@ func moodFromHistory(c *gin.Context) {
  */
 func user(c *gin.Context) {
 	spotifyClient := clientMagic(c)
-	var Loc userLocation
+	var User userLocation
 	// Loc := getUserLocation(c) // TODO - it is slowing down a lot and is not useful without appengine. Lets user select.
 	// log.Printf("city: %s, lat: %s, lon: %s, timezone: %s, time: %s", Loc.City, Loc.Lat, Loc.Lon, Loc.Tz, Loc.Time)
 	if spotifyClient != nil {
@@ -452,21 +452,14 @@ func user(c *gin.Context) {
 		if err != nil {
 			log.Println(err.Error())
 		}
-		Loc.Country = user.Country
-		tz, err := getTimeZones(string(user.Country))
-		if err == nil {
-			Loc.Tz = tz[0] // TODO - this will work for small countries, for Russia, US let user decide
-		}
-		location, _ = time.LoadLocation(Loc.Tz)
-		Loc.Time = time.Now().In(location).Format("15:04")
-		Loc.UnixTime = time.Now().Unix()
-		Loc.Name = user.DisplayName
-		Loc.URL = user.ExternalURLs["spotify"]
+		User.Country = user.Country
+		User.Name = user.DisplayName
+		User.URL = user.ExternalURLs["spotify"]
 		c.HTML(
 			http.StatusOK,
 			"user.html",
 			gin.H{
-				"Location": Loc,
+				"User": User,
 			},
 		)
 		return

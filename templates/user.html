@@ -15,13 +15,11 @@
 </script>
 
 <div class="container-fluid">
-    {{ with .Location }}
+    {{ with .User }}
     <h4 class="display-4">You are logged in as <a href="{{ .URL }}">{{ .Name }}</a>.</h4>
     <p class="lead">Your Spotify account is from <strong>{{ .Country }}</strong></p>
-    <p>Your timezone is probably <mark id="timezone"></mark> and the time is <strong id="time"></strong>
-    <p>Your timezone is probably <mark>{{ .Tz }}</mark> and the time is {{ .Time }}</p>
-    {{ if .City }}<p><small>You seem to be browsing from {{ .City }} (<em>{{ .Lat }}/{{ .Lon }}</em>).</small></p>{{ end }}
     {{ end }}
+    <p>Your timezone is probably <mark id="timezone"></mark> and the time is <strong id="time"></strong>
 </div>
 <!--Embed the footer.html template at this location-->
 {{ template "footer.html" .}}
