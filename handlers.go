@@ -253,7 +253,7 @@ func charts(c *gin.Context) {
 
 	spotifyClient := clientMagic(c)
 	if spotifyClient == nil {
-		c.JSON(http.StatusTeapot, gin.H{"/analysis": "failed to find  client"})
+		c.JSON(http.StatusTeapot, gin.H{endpoint: "failed to get Spotify client"})
 		return
 	}
 	{
@@ -262,7 +262,9 @@ func charts(c *gin.Context) {
 		if user == nil {
 			u, err := spotifyClient.CurrentUser()
 			if err != nil {
-				log.Panic(err)
+				log.Println(err.Error())
+				c.JSON(http.StatusTeapot, gin.H{endpoint: "failed to get Spotify user"})
+				return
 			}
 			user = string(u.ID)
 		}
@@ -281,7 +283,7 @@ func charts(c *gin.Context) {
 			trackIDs = append(trackIDs, trackID)
 		}
 
-		data := miniTrackAttributes(trackIDs, spotifyClient)
+		data := miniAudioFeatures(trackIDs, spotifyClient)
 		if err != nil {
 			log.Println(err.Error())
 		}
@@ -434,22 +436,30 @@ func moodFromHistory(c *gin.Context) {
 		)
 		return
 	}
-	c.JSON(http.StatusTeapot, gin.H{"/moodFromHistory": "failed to find  client"})
+	c.JSON(http.StatusTeapot, gin.H{endpoint: "failed to find Spotify client"})
 }
 
 /* user - displays user identity (display name)
  */
 func user(c *gin.Context) {
 	spotifyClient := clientMagic(c)
-	Loc := getUserLocation(c)
-	log.Printf("city: %s, lat: %s, lon: %s, timezone: %s, time: %s", Loc.City, Loc.Lat, Loc.Lon, Loc.Tz, Loc.Time)
+	var Loc userLocation
+	// Loc := getUserLocation(c) // TODO - it is slowing down a lot and is not useful without appengine. Lets user select.
+	// log.Printf("city: %s, lat: %s, lon: %s, timezone: %s, time: %s", Loc.City, Loc.Lat, Loc.Lon, Loc.Tz, Loc.Time)
 	if spotifyClient != nil {
 		// use the client to make calls that require authorization
 		user, err := spotifyClient.CurrentUser()
 		if err != nil {
-			log.Panic(err)
+			log.Println(err.Error())
 		}
 		Loc.Country = user.Country
+		tz, err := getTimeZones(string(user.Country))
+		if err == nil {
+			Loc.Tz = tz[0] // TODO - this will work for small countries, for Russia, US let user decide
+		}
+		location, _ = time.LoadLocation(Loc.Tz)
+		Loc.Time = time.Now().In(location).Format("15:04")
+		Loc.UnixTime = time.Now().Unix()
 		Loc.Name = user.DisplayName
 		Loc.URL = user.ExternalURLs["spotify"]
 		c.HTML(

@@ -3,12 +3,15 @@ token.json
 *.json
 !app.json
 !cloudbuild.json
+.env.yaml
 go.sum
+init.sh
+gcrgc.sh
 *.sh
 favicon.png
 bin/**
-.env.yaml
 *.bak
 *.bak.go
 *.go.orig
+robots.txt
 spotify.txt

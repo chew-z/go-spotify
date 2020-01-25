@@ -2,11 +2,8 @@
 
 <!--Embed the header.html template at this location-->
 {{ template "header.html" .}}
-<!-- <p> -->
-<!--   {{with .Email}}You are currently logged in as {{.}}.{{end}} -->
-<!--   {{with .Login}}<a href="{{.}}">Sign in</a>{{end}} -->
-<!--   {{with .Logout}}<a href="{{.}}">Sign out</a>{{end}} -->
-<!-- </p> -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.24.0/moment.min.js" integrity="sha256-4iQZ6BVL4qNKlQ27TExEhBN1HFPvAvAMbFavKKosSWQ=" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/moment-timezone/0.5.27/moment-timezone-with-data-2012-2022.min.js" integrity="sha256-gfmyBrlUtChLivBA2rRK/bsljMoum6kxbl7oFeCVkmc=" crossorigin="anonymous"></script>
 <h4 class="display-4">{{ .title }}</h4>
 <div class="container">
 <nav aria-label="Page navigation example">
@@ -34,10 +31,20 @@
 </nav>
 </div>
 <div class="container">
+    <script>
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    </script>
     {{range .Tracks }}
     <div class="card">
         <div class="card-body">
-            <p class="card-text">[{{.PlayedAt.Format "15:04:05"}}] <a href="https://open.spotify.com/track/{{ .ID }}">{{.Name}}</a> <em>{{.Artists}}</em></p>
+<script>
+    $( document ).ready(function() {    
+    let gotime = {{ .PlayedAt }}
+    let goT = moment(gotime).tz(tz).format('ddd HH:mm');  
+        $('#{{ .ID }}').text(goT);
+    });
+</script>
+<p class="card-text"><mark id="{{.ID}}"></mark>&nbsp<a href="https://open.spotify.com/track/{{ .ID }}">{{.Name}}</a> <em>{{.Artists}}</em></p>
         </div>
     </div>
     {{end}}

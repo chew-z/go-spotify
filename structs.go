@@ -72,12 +72,13 @@ type audioTrack struct {
 }
 
 type userLocation struct {
-	Name    string
-	URL     string
-	Country string
-	Time    string
-	Tz      string
-	Lat     string
-	Lon     string
-	City    string
+	Name     string
+	URL      string
+	Country  string
+	Time     string
+	UnixTime int64
+	Tz       string
+	Lat      string
+	Lon      string
+	City     string
 }

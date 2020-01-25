@@ -1,12 +1,14 @@
 bin/**
+CloudFunctions/**
 .env.yaml
 app.yaml
 app.json
+token.json
 README.md
 *.sh
+gcrgc.sh
+init.sh
 *.bak
 *.bak.go
 *.go.orig
-CloudFunctions/**
 spotify.txt
-token.json

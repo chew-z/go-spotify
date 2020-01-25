@@ -2,10 +2,23 @@
 
 <!--Embed the header.html template at this location-->
 {{ template "header.html" .}}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.24.0/moment.min.js" integrity="sha256-4iQZ6BVL4qNKlQ27TExEhBN1HFPvAvAMbFavKKosSWQ=" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/moment-timezone/0.5.27/moment-timezone-with-data-2012-2022.min.js" integrity="sha256-gfmyBrlUtChLivBA2rRK/bsljMoum6kxbl7oFeCVkmc=" crossorigin="anonymous"></script>
+<script>
+    $( document ).ready(function() {    
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    // const gotime = 1000 * {{ .Location.UnixTime }}
+    let now = moment().tz(tz).format('HH:mm');  
+    $('#timezone').text(tz);
+    $('#time').text(now);
+    });
+</script>
+
 <div class="container-fluid">
     {{ with .Location }}
     <h4 class="display-4">You are logged in as <a href="{{ .URL }}">{{ .Name }}</a>.</h4>
     <p class="lead">Your Spotify account is from <strong>{{ .Country }}</strong></p>
+    <p>Your timezone is probably <mark id="timezone"></mark> and the time is <strong id="time"></strong>
     <p>Your timezone is probably <mark>{{ .Tz }}</mark> and the time is {{ .Time }}</p>
     {{ if .City }}<p><small>You seem to be browsing from {{ .City }} (<em>{{ .Lat }}/{{ .Lon }}</em>).</small></p>{{ end }}
     {{ end }}

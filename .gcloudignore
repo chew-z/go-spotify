@@ -1,11 +1,11 @@
 README.md
-deploy.sh
 .gitignore
 go.sum
 bin/**
 CloudFunctions/**
 token.json
 init.sh
+gcrgc.sh
 *.bak
 *.bak.go
 *.go.orig

@@ -208,32 +208,8 @@ func miniAudioFeatures(ids []spotify.ID, spotifyClient *spotify.Client) *[]audio
 	}
 	return &audioTracks
 }
-func miniTrackAttributes(ids []spotify.ID, spotifyClient *spotify.Client) *[]audioTrack {
-	var f audioTrack
-	var audioTracks []audioTrack
-	chunks := chunkIDs(ids, pageLimit)
-	audioFeatures, _ := spotifyClient.GetAudioFeatures(chunks[0]...) // GetAudioFeatures has variadic argument
-	fullTracks, _ := fullTrackGetMany(spotifyClient, chunks[0])
-	for i, res := range audioFeatures {
-		if res.ID != fullTracks[i].ID {
-			log.Println("miniAudioFeatures: NOT IN SYNC")
-		}
-		f.ID = res.ID
-		f.Name = fullTracks[i].Name
-		f.Artists = joinArtists(fullTracks[i].Artists, ", ")
-		f.Acousticness = int(100.0 * res.Acousticness)
-		f.Instrumentalness = int(100.0 * res.Instrumentalness)
-		f.Energy = int(100.0 * res.Energy)
-		f.Loudness = int(res.Loudness)
-		f.Tempo = int(res.Tempo)
-		f.URL = fullTracks[i].ExternalURLs["spotify"]
-		f.Image = fullTracks[i].Album.Images[2].URL
-		audioTracks = append(audioTracks, f)
-	}
-	return &audioTracks
-}
 
-/* getTrackAttributes - return averaged attributes for set of tracks
+/* getTrackAttributes - return averaged audio features for set of tracks
  */
 func getTrackAttributes(spotifyClient *spotify.Client, tracks []spotify.FullTrack) (*spotify.TrackAttributes, error) {
 	var attributes *spotify.TrackAttributes
