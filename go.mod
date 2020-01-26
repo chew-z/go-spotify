@@ -5,6 +5,7 @@ go 1.13
 require (
 	cloud.google.com/go v0.46.3
 	cloud.google.com/go/firestore v1.1.1
+	firebase.google.com/go v3.12.0+incompatible
 	github.com/boj/redistore v0.0.0-20180917114910-cd5dcc76aeff // indirect
 	github.com/chew-z/spotify v0.0.21
 	github.com/coreos/go-oidc v2.1.0+incompatible
@@ -14,6 +15,7 @@ require (
 	github.com/gorilla/sessions v1.2.0 // indirect
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/pquerna/cachecontrol v0.0.0-20180517163645-1555304b9b35 // indirect
+	github.com/zmb3/spotify v0.0.0-20200112163645-71a4c67d18db
 	golang.org/x/oauth2 v0.0.0-20200107190931-bf48bf16ab8d
 	google.golang.org/api v0.15.0
 	gopkg.in/square/go-jose.v2 v2.4.1 // indirect

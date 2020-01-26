@@ -1,10 +1,9 @@
 module go-spotify/CloudFunctions/CloudRecent
 
-go 1.11
+go 1.13
 
 require (
 	cloud.google.com/go/firestore v1.1.1
-	firebase.google.com/go v3.11.1+incompatible
-	github.com/zmb3/spotify v0.0.0-20191213135453-f2845aa57886
+	github.com/zmb3/spotify v0.0.0-20200112163645-71a4c67d18db
 	golang.org/x/oauth2 v0.0.0-20200107190931-bf48bf16ab8d
 )

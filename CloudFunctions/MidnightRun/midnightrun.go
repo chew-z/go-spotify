@@ -29,7 +29,6 @@ type firestoreUser struct {
 }
 
 var (
-	projectID       = os.Getenv("GOOGLE_CLOUD_PROJECT")
 	firestoreClient *firestore.Client
 	ctx             = context.Background()
 )

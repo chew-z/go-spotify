@@ -8,22 +8,10 @@ import (
 	"net/http"
 	"os"
 	"strings"
-	"time"
 
 	"cloud.google.com/go/firestore"
-	firebase "firebase.google.com/go"
 	"github.com/zmb3/spotify"
 	"golang.org/x/oauth2"
-)
-
-var (
-	// GCLOUD_PROJECT is automatically set by the Cloud Functions runtime.
-	projectID       = os.Getenv("GOOGLE_CLOUD_PROJECT")
-	ctx             = context.Background()
-	firestoreClient *firestore.Client
-	location, _     = time.LoadLocation("Europe/Warsaw")
-	redirectURI     = os.Getenv("REDIRECT_URI")
-	auth            = spotify.NewAuthenticator(redirectURI, spotify.ScopeUserReadPrivate, spotify.ScopeUserTopRead, spotify.ScopeUserLibraryRead, spotify.ScopeUserFollowRead, spotify.ScopeUserReadRecentlyPlayed, spotify.ScopePlaylistModifyPublic, spotify.ScopePlaylistModifyPrivate)
 )
 
 type firestoreToken struct {
@@ -32,20 +20,20 @@ type firestoreToken struct {
 	token *oauth2.Token
 }
 
-func init() {
-	// Use the application default credentials.
-	conf := &firebase.Config{ProjectID: projectID}
-	// Use context.Background() because the app/client should persist across invocations.
-	ctx := context.Background()
-	app, err := firebase.NewApp(ctx, conf)
-	if err != nil {
-		log.Fatalf("firebase.NewApp: %v", err)
-	}
+var (
+	ctx             = context.Background()
+	firestoreClient *firestore.Client
+	redirectURI     = os.Getenv("REDIRECT_URI")
+	auth            = spotify.NewAuthenticator(redirectURI, spotify.ScopeUserReadPrivate, spotify.ScopeUserTopRead, spotify.ScopeUserLibraryRead, spotify.ScopeUserFollowRead, spotify.ScopeUserReadRecentlyPlayed, spotify.ScopePlaylistModifyPublic, spotify.ScopePlaylistModifyPrivate)
+)
 
-	firestoreClient, err = app.Firestore(ctx)
-	if err != nil {
-		log.Fatalf("app.Firestore: %v", err)
-	}
+func main() {
+	defer firestoreClient.Close()
+}
+
+func init() {
+	ctx := context.Background()
+	firestoreClient = initFirestoreDatabase(ctx)
 }
 
 /*CloudRecent - ..
@@ -136,4 +124,16 @@ func joinArtists(artists []spotify.SimpleArtist, separator string) string {
 		}(),
 		separator,
 	)
+}
+
+/*initFirestoreDatabase - as the name says creates Firestore client
+in Google Cloud it is using project ID, on localhost credentials file
+*/
+func initFirestoreDatabase(ctx context.Context) *firestore.Client {
+	// sa := option.WithCredentialsFile(".firebase-credentials.json")
+	firestoreClient, err := firestore.NewClient(ctx, os.Getenv("GOOGLE_CLOUD_PROJECT"))
+	if err != nil {
+		log.Panic(err)
+	}
+	return firestoreClient
 }

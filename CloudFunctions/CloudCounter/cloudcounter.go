@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"cloud.google.com/go/firestore"
-	firebase "firebase.google.com/go"
 )
 
 // FirestoreEvent is the payload of a Firestore event.
@@ -47,28 +46,18 @@ type FirestoreValue struct {
 // 	Count    int       `firestore:"count,omitempty"`
 // }
 
-// GCLOUD_PROJECT is automatically set by the Cloud Functions runtime.
-var projectID = os.Getenv("GOOGLE_CLOUD_PROJECT")
+var (
+	firestoreClient *firestore.Client
+	ctx             = context.Background()
+)
 
-// client is a Firestore client, reused between function invocations.
-// TODO - above is exact example from https://cloud.google.com/functions/docs/calling/cloud-firestore
-// Shall we believe in persistence here !?
-var firestoreClient *firestore.Client
+func main() {
+	defer firestoreClient.Close()
+}
 
 func init() {
-	// Use the application default credentials.
-	conf := &firebase.Config{ProjectID: projectID}
-	// Use context.Background() because the app/client should persist across invocations.
 	ctx := context.Background()
-	app, err := firebase.NewApp(ctx, conf)
-	if err != nil {
-		log.Panicf("firebase.NewApp: %v", err)
-	}
-
-	firestoreClient, err = app.Firestore(ctx)
-	if err != nil {
-		log.Panicf("app.Firestore: %v", err)
-	}
+	firestoreClient = initFirestoreDatabase(ctx)
 }
 
 // CloudCounter is triggered by a change to a Firestore document.
@@ -92,4 +81,16 @@ func CloudCounter(ctx context.Context, e FirestoreEvent) error {
 	}
 	// log.Println(w.UpdateTime)
 	return nil
+}
+
+/*initFirestoreDatabase - as the name says creates Firestore client
+in Google Cloud it is using project ID, on localhost credentials file
+*/
+func initFirestoreDatabase(ctx context.Context) *firestore.Client {
+	// sa := option.WithCredentialsFile(".firebase-credentials.json")
+	firestoreClient, err := firestore.NewClient(ctx, os.Getenv("GOOGLE_CLOUD_PROJECT"))
+	if err != nil {
+		log.Panic(err)
+	}
+	return firestoreClient
 }
