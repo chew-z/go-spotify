@@ -5,8 +5,11 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/patrickmn/go-cache"
+	"golang.org/x/time/rate"
 )
 
 /*Redirector - middleware for redirecting CloudRun
@@ -39,5 +42,29 @@ func Headers() gin.HandlerFunc {
 		if strings.HasPrefix(c.Request.RequestURI, "/static/") {
 			c.Header("Cache-Control", "max-age=86400")
 		}
+	}
+}
+
+var limiterSet = cache.New(5*time.Minute, 10*time.Minute)
+
+/*NewRateLimiter -a in-memory middleware to limit access rate
+by custom key and rate
+*/
+func NewRateLimiter(key func(*gin.Context) string, createLimiter func(*gin.Context) (*rate.Limiter, time.Duration),
+	abort func(*gin.Context)) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		k := key(c)
+		limiter, ok := limiterSet.Get(k)
+		if !ok {
+			var expire time.Duration
+			limiter, expire = createLimiter(c)
+			limiterSet.Set(k, limiter, expire)
+		}
+		ok = limiter.(*rate.Limiter).Allow()
+		if !ok {
+			abort(c)
+			return
+		}
+		c.Next()
 	}
 }

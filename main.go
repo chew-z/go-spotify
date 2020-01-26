@@ -5,10 +5,13 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"cloud.google.com/go/firestore"
 	"github.com/gin-gonic/contrib/sessions"
 	"github.com/gin-gonic/gin"
+	limit "github.com/yangxikun/gin-limit-by-key"
+	"golang.org/x/time/rate"
 )
 
 var (
@@ -44,7 +47,16 @@ func init() {
 
 	router := gin.Default()
 	router.Use(sessions.Sessions("go-spotify", store))
-
+	// A zero/default http.Server, like the one used by the package-level helpers
+	// http.ListenAndServe and http.ListenAndServeTLS, comes with no timeouts.
+	// You don't want that.
+	server := &http.Server{
+		Addr:         ":8080",
+		Handler:      router,
+		ReadTimeout:  3 * time.Second,
+		WriteTimeout: 5 * time.Second,
+		IdleTimeout:  90 * time.Second,
+	}
 	// Process the templates at the start so that they don't have to be loaded
 	// from the disk again. This makes serving HTML pages very fast.
 	router.LoadHTMLGlob("templates/*")
@@ -53,6 +65,15 @@ func init() {
 	router.StaticFile("/favicon.ico", "./favicon.ico")
 	router.StaticFile("/apple-touch-icon.png", "./static/apple-touch-icon.png")
 	router.StaticFile("/apple-touch-icon-precomposed.png", "./static/apple-touch-icon-precomposed.png")
+	// In real world we need rate limiting
+	router.Use(limit.NewRateLimiter(func(c *gin.Context) string {
+		return c.ClientIP() // limit rate by client ip
+	}, func(c *gin.Context) (*rate.Limiter, time.Duration) {
+		return rate.NewLimiter(rate.Every(100*time.Millisecond), 5), time.Hour // limit 10 qps/clientIp
+		// and permit bursts of at most 10 tokens, and the limiter liveness time duration is 1 hour
+	}, func(c *gin.Context) {
+		c.AbortWithStatus(429) // handle exceed rate limit request
+	}))
 
 	router.GET("/", func(c *gin.Context) {
 		c.HTML(http.StatusOK, "main.html", gin.H{
@@ -86,5 +107,6 @@ func init() {
 		authorized.GET("/search", search)
 		authorized.GET("/recommend", recommend)
 	}
-	router.Run()
+	// router.Run()
+	server.ListenAndServe()
 }
