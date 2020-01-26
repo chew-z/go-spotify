@@ -7,24 +7,31 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.9.3/Chart.bundle.min.js" integrity="sha256-TQq84xX6vkwR0Qs1qH5ADkP+MvH0W+9E7TdHJsoIQiM=" crossorigin="anonymous"></script>
 
 <h4 class="display-4">{{ .title }}</h4>
+<script>
+function addUrlParameter(name, value) {
+  var searchParams = new URLSearchParams(window.location.search)
+  searchParams.set(name, value)
+  window.location.search = searchParams.toString()
+}
+</script>
 
 <div class="container">
 <nav aria-label="Page navigation example">
     {{ with .Navigation }}
   <ul class="pagination justify-content-end">
       <li class="page-item {{ if not .Previous }}disabled{{ end}}">
-        <a class="page-link" href="/chart?page={{ .Previous }}" aria-label="Previous">
+        <a class="page-link" onclick="addUrlParameter('page', {{ .Previous }})" aria-label="Previous">
         <span aria-hidden="true">&laquo;</span>
         <span class="sr-only">Previous</span>
       </a>
     </li>
     {{ if .Previous }}
-    <li class="page-item"><a class="page-link" href="/chart?page={{ .Previous }}">{{ .Previous }}</a></li>
+    <li class="page-item"><a class="page-link" onclick="addUrlParameter('page', {{ .Previous }})">{{ .Previous }}</a></li>
     {{ end }}
-    <li class="page-item"><a class="page-link" href="/chart?page={{ .Current }}">{{ .Current }}</a></li>
-    <li class="page-item"><a class="page-link" href="/chart?page={{ .Next }}">{{ .Next }}</a></li>
+    <li class="page-item"><a class="page-link" onclick="addUrlParameter('page', {{ .Current }})">{{ .Current }}</a></li>
+    <li class="page-item"><a class="page-link" onclick="addUrlParameter('page', {{ .Next }})">{{ .Next }}</a></li>
     <li class="page-item">
-        <a class="page-link" href="/chart?page={{ .Next }}" aria-label="Next">
+        <a class="page-link" onclick="addUrlParameter('page', {{ .Next}})" aria-label="Next">
         <span aria-hidden="true">&raquo;</span>
         <span class="sr-only">Next</span>
       </a>
@@ -34,13 +41,6 @@
 </nav>
 </div>
 <div class="container d-flex justify-content-end">
-<script>
-function addUrlParameter(name, value) {
-  var searchParams = new URLSearchParams(window.location.search)
-  searchParams.set(name, value)
-  window.location.search = searchParams.toString()
-}
-</script>
 <a onclick="addUrlParameter('chart', 'pie.html')" class="btn btn-light btn-sm btn-lg active" role="button" aria-pressed="true">Pie</a>
 </div>
 
