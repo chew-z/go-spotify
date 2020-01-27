@@ -1,11 +1,10 @@
 // index.js
-
 function onShare() {
-    const { title } = document;
+    const { title } = 'Music';
     const url = document.querySelector('link[rel=canonical]')
         ? document.querySelector('link[rel=canonical]').href
         : document.location.href;
-    const text = 'music.suka.yoga';
+    const text = 'Look, I have found companion for Spotify!';
 
     if (navigator.share) {
         navigator
@@ -18,7 +17,7 @@ function onShare() {
                 alert('Thanks for Sharing!');
             })
             .catch((err) => {
-                alert(`Couldn't share ${err}`);
+                console.log(`Couldn't share ${err}`);
             });
     } else {
         alert('Not supported !!');
@@ -28,7 +27,7 @@ function onShare() {
 function initializeApp() {
     if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('./static/sw.js').then(() => {
-            document.querySelector('#share').addEventListener('click', () => {
+            document.querySelector('#share_button').addEventListener('click', () => {
                 onShare();
             });
         });
@@ -36,3 +35,12 @@ function initializeApp() {
 }
 
 initializeApp();
+
+
+$( document ).ready(function() {
+    if (navigator.share) {
+        $("#share_button").removeClass("d-none").addClass("d-block");
+    } else {
+        $("#share_button").addClass("d-none");
+    }
+});

@@ -98,7 +98,7 @@ func clientMagic(c *gin.Context) *spotify.Client {
 	uuid := session.Get("uuid").(string)
 	userString := session.Get("user").(string)
 	authPath := session.Get("authPath").(string)
-	// log.Printf("/clientMagic: session id: %s", uuid)
+	log.Printf("/clientMagic: session id: %s", uuid)
 	// If the session is running Spotify client is probably cached
 	if gClient, foundClient := kaszka.Get(uuid); foundClient {
 		spotifyClient = gClient.(*spotify.Client)

@@ -102,7 +102,7 @@ func login(c *gin.Context) {
 		// save necessary variables into session
 		session := sessions.Default(c)
 		// TODO - is it necessary and what would be optimal?
-		sessions.Default(c).Options(sessions.Options{MaxAge: 1800}) // make a session timeout after X seconds of inactivity
+		sessions.Default(c).Options(sessions.Options{MaxAge: sessionTimeout}) // make a session timeout after X seconds of inactivity
 		log.Printf("/login: %s from %s", string(user.ID), string(user.Country))
 		session.Set("user", string(user.ID))
 		session.Set("country", string(user.Country))
