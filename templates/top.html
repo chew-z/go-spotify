@@ -6,17 +6,7 @@
 <div class="container">
     <div class="card-columns">
         {{range .Tracks }}
-        {{ template "item.html" .}}
-        <!-- <div class="card"> -->
-        <!--     <a href="{{ .URL }}"> -->
-        <!--         <img class="card-img-top" style="object-fit: cover;" src="{{ .Image }}" alt="{{ .Name }}"> -->
-        <!--     </a> -->
-        <!--     <div class="card-body"> -->
-        <!--         <h5 class="card-title"><a href="{{ .URL }}">{{.Name}}</a></h5> -->
-        <!--         <p class="card-text">{{.Album}}</p> -->
-        <!--         <p class="card-text"><em>{{.Artists}}</em></p> -->
-        <!--     </div> -->
-        <!-- </div> -->
+            {{ template "item.html" .}}
         {{end}}
     </div>
 </div>
