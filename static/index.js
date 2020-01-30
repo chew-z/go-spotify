@@ -41,6 +41,6 @@ $( document ).ready(function() {
     if (navigator.share) {
         $("#share_button").removeClass("d-none").addClass("d-block");
     } else {
-        $("#share_button").addClass("d-none");
+        $("#share_button").removeClass("d-block").addClass("d-none");
     }
 });

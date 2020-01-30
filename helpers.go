@@ -200,8 +200,8 @@ func miniAudioFeatures(ids []spotify.ID, spotifyClient *spotify.Client) *[]audio
 		f.Acousticness = int(100.0 * res.Acousticness)
 		f.Instrumentalness = int(100.0 * res.Instrumentalness)
 		f.Energy = int(100.0 * res.Energy)
-		f.Loudness = int(1.66*res.Loudness + 100)
-		f.Tempo = int(res.Tempo - 100.0)
+		f.Loudness = int(1.66*res.Loudness + 100.0)
+		f.Tempo = int(res.Tempo - 60.0)
 		f.URL = fullTracks[i].ExternalURLs["spotify"]
 		f.Image = fullTracks[i].Album.Images[2].URL
 		audioTracks = append(audioTracks, f)
