@@ -102,6 +102,7 @@ func init() {
 		authorized.GET("/logout", logout)
 		// TODO - make useful
 		authorized.GET("/tracks", tracks)
+		authorized.GET("/albumtracks", albumTracks)
 		authorized.GET("/playlists", playlists)
 		authorized.GET("/albums", albums)
 		// TXT pages TODO

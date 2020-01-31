@@ -457,9 +457,7 @@ func user(c *gin.Context) {
 	c.String(http.StatusTeapot, "I am a teapot, that's all I know")
 }
 
-/* -------- TODO - everything below has to change or go -------- */
-
-/* tracks - display some of user's tracks
+/* tracks - display tracks for a playlist
  */
 func tracks(c *gin.Context) {
 	spotifyClient := clientMagic(c)
@@ -495,14 +493,30 @@ func tracks(c *gin.Context) {
 			if err != nil {
 				log.Println(err.Error())
 			}
-
 		}
+		type playlist struct {
+			ID     string
+			Name   string
+			Owner  string
+			URL    string
+			Image  string
+			Tracks uint
+		}
+		var pls playlist
+		plist, err := spotifyClient.GetPlaylist(playlistID)
+		pls.Name = plist.Name
+		pls.Owner = plist.Owner.DisplayName
+		pls.URL = plist.ExternalURLs["spotify"]
+		pls.Image = plist.Images[0].URL
+		pls.Tracks = uint(plist.Tracks.Total)
+
 		c.HTML(
 			http.StatusOK,
-			"tracks.html",
+			"playlistTracks.html",
 			gin.H{
-				"Tracks": tracks,
-				"title":  "Tracks",
+				"Tracks":   tracks,
+				"Playlist": pls,
+				"title":    "Tracks",
 			},
 		)
 	}()
@@ -563,6 +577,65 @@ func playlists(c *gin.Context) {
 	}()
 }
 
+func albumTracks(c *gin.Context) {
+	spotifyClient := clientMagic(c)
+	if spotifyClient == nil {
+		c.JSON(http.StatusTeapot, gin.H{"message": "failed to find  client"})
+		return
+	}
+
+	defer func() {
+		type albums struct {
+			ID      string
+			Name    string
+			Artists string
+			URL     string
+			Image   string
+			Tracks  int
+		}
+		al := c.Query("al")
+		albumID := spotify.ID(al)
+		// use the client to make calls that require authorization
+		alTracks, err := spotifyClient.GetAlbumTracks(albumID)
+		if err != nil {
+			log.Panic(err)
+			c.String(http.StatusNotFound, err.Error())
+		}
+		var tracks []topTrack
+		for page := 1; ; page++ {
+			for _, item := range alTracks.Tracks {
+				var tt topTrack
+				tt.Name = item.Name
+				tt.Artists = joinArtists(item.Artists, ", ")
+				tt.URL = item.ExternalURLs["spotify"]
+				tracks = append(tracks, tt)
+			}
+			err = spotifyClient.NextPage(alTracks)
+			if err == spotify.ErrNoMorePages {
+				break
+			}
+			if err != nil {
+				log.Println(err.Error())
+			}
+		}
+		var alb albums
+		album, err := spotifyClient.GetAlbum(albumID)
+		alb.Name = album.Name
+		alb.URL = album.ExternalURLs["spotify"]
+		alb.Image = album.Images[0].URL
+		alb.Tracks = album.Tracks.Total
+		c.HTML(
+			http.StatusOK,
+			"albumTracks.html",
+			gin.H{
+				"Tracks": tracks,
+				"Album":  alb,
+				"title":  "Tracks",
+			},
+		)
+	}()
+}
+
 /* albums - display some of user's albums
  */
 func albums(c *gin.Context) {
@@ -580,21 +653,33 @@ func albums(c *gin.Context) {
 			c.String(http.StatusNotFound, err.Error())
 		}
 		type albums struct {
+			ID      string
 			Name    string
 			Artists string
 			URL     string
 			Image   string
 			Tracks  int
 		}
-		var al albums
 		var als []albums
-		for _, item := range userAlbums.Albums {
-			al.Name = item.Name
-			al.Artists = joinArtists(item.Artists, ", ")
-			al.URL = item.ExternalURLs["spotify"]
-			al.Image = item.Images[0].URL
-			al.Tracks = item.Tracks.Total
-			als = append(als, al)
+		for page := 1; ; page++ {
+			for _, item := range userAlbums.Albums {
+				var al albums
+				al.ID = item.ID.String()
+				al.Name = item.Name
+				al.Artists = joinArtists(item.Artists, ", ")
+				al.URL = item.ExternalURLs["spotify"]
+				al.Image = item.Images[0].URL
+				al.Tracks = item.Tracks.Total
+				als = append(als, al)
+			}
+			err = spotifyClient.NextPage(userAlbums)
+			if err == spotify.ErrNoMorePages {
+				break
+			}
+			if err != nil {
+				log.Println(err.Error())
+			}
+
 		}
 		c.HTML(
 			http.StatusOK,
@@ -606,6 +691,8 @@ func albums(c *gin.Context) {
 		)
 	}()
 }
+
+/* -------- TODO - everything below has to change or go -------- */
 
 /* artists - displays user followed artists
  */

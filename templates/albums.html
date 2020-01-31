@@ -11,7 +11,16 @@
 <div class="container">
     <div class="card-columns">
         {{range .Albums }}
-            {{ template "item.html" .}}
+        <div class="card">
+            <a href="{{ .URL }}?utm_campaign=music.suka.yoga">
+                <img class="card-img" style="object-fit: scale-down;" src="{{ .Image }}" alt="{{ .Name }}">
+            </a>
+            <div class="card-body">
+                <h5 class="card-title"><a href="{{ .URL }}?utm_campaign=music.suka.yoga">{{.Name}}</a></h5>
+                <p class="card-text"><em>{{.Artists}}</em></p>
+                <a href="/albumtracks?al={{ .ID }}" class="btn btn-outline-info">{{ .Tracks }} tracks</a>
+            </div>
+        </div>
         {{end}}
     </div>
 </div>

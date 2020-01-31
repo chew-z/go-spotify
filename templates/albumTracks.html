@@ -1,0 +1,30 @@
+<!--tracks.html-->
+
+<!--Embed the header.html template at this location-->
+{{ template "header.html" .}}
+<div class="container mw-50">
+    <div class="card mb-3" style="max-width: 18rem;">
+        <div class="card-body">
+            <h4 class="card-title">{{ .Album.Name }}</h4>
+        </div>
+        <div class="embed-responsive embed-responsive-1by1">
+                <a href="{{ .Album.URL }}?utm_campaign=music.suka.yoga">
+                    <img src="{{ .Album.Image}}" alt="{{ .Album.Name }}" class="card-img-top embed-responsive-item img-thumbnail">
+                </a>
+        </div>
+    </div>
+</div>
+<div class="container">
+    <div class="card-columns">
+        {{range .Tracks }}
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title"><a href="{{ .URL }}?utm_campaign=music.suka.yoga">{{.Name}}</a></h5>
+                <p class="card-text"><em>{{.Artists}}</em></p>
+            </div>
+        </div>
+        {{end}}
+    </div>
+</div>
+<!--Embed the footer.html template at this location-->
+{{ template "footer.html" .}}
