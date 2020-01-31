@@ -469,21 +469,33 @@ func tracks(c *gin.Context) {
 	}
 
 	defer func() {
+		pl := c.Query("pl")
+		playlistID := spotify.ID(pl)
 		// use the client to make calls that require authorization
-		userTracks, err := spotifyClient.CurrentUsersTracks()
+		plTracks, err := spotifyClient.GetPlaylistTracks(playlistID)
 		if err != nil {
 			log.Panic(err)
 			c.String(http.StatusNotFound, err.Error())
 		}
-		var tt topTrack
 		var tracks []topTrack
-		for _, item := range userTracks.Tracks {
-			tt.Name = item.Name
-			tt.Album = item.Album.Name
-			tt.Artists = joinArtists(item.Artists, ", ")
-			tt.URL = item.ExternalURLs["spotify"]
-			tt.Image = item.Album.Images[0].URL
-			tracks = append(tracks, tt)
+		for page := 1; ; page++ {
+			for _, item := range plTracks.Tracks {
+				var tt topTrack
+				tt.Name = item.Track.Name
+				tt.Album = item.Track.Album.Name
+				tt.Artists = joinArtists(item.Track.Artists, ", ")
+				tt.URL = item.Track.ExternalURLs["spotify"]
+				tt.Image = item.Track.Album.Images[0].URL
+				tracks = append(tracks, tt)
+			}
+			err = spotifyClient.NextPage(plTracks)
+			if err == spotify.ErrNoMorePages {
+				break
+			}
+			if err != nil {
+				log.Println(err.Error())
+			}
+
 		}
 		c.HTML(
 			http.StatusOK,
@@ -493,7 +505,6 @@ func tracks(c *gin.Context) {
 				"title":  "Tracks",
 			},
 		)
-
 	}()
 }
 
@@ -507,28 +518,39 @@ func playlists(c *gin.Context) {
 	}
 
 	defer func() {
-		// use the client to make calls that require authorization
-		playlists, err := spotifyClient.CurrentUsersPlaylists()
-		if err != nil {
-			log.Panic(err)
-			c.String(http.StatusNotFound, err.Error())
-		}
 		type playlist struct {
+			ID     string
 			Name   string
 			Owner  string
 			URL    string
 			Image  string
 			Tracks uint
 		}
-		var pl playlist
+		// use the client to make calls that require authorization
+		pages, err := spotifyClient.CurrentUsersPlaylists()
+		if err != nil {
+			log.Panic(err)
+			c.String(http.StatusNotFound, err.Error())
+		}
 		var pls []playlist
-		for _, item := range playlists.Playlists {
-			pl.Name = item.Name
-			pl.Owner = item.Owner.DisplayName
-			pl.URL = item.ExternalURLs["spotify"]
-			pl.Image = item.Images[0].URL
-			pl.Tracks = item.Tracks.Total
-			pls = append(pls, pl)
+		for page := 1; ; page++ {
+			for _, item := range pages.Playlists {
+				var pl playlist
+				pl.ID = item.ID.String()
+				pl.Name = item.Name
+				pl.Owner = item.Owner.DisplayName
+				pl.URL = item.ExternalURLs["spotify"]
+				pl.Image = item.Images[0].URL
+				pl.Tracks = item.Tracks.Total
+				pls = append(pls, pl)
+			}
+			err = spotifyClient.NextPage(pages)
+			if err == spotify.ErrNoMorePages {
+				break
+			}
+			if err != nil {
+				log.Println(err.Error())
+			}
 		}
 		c.HTML(
 			http.StatusOK,
