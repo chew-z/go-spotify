@@ -70,6 +70,17 @@ type audioTrack struct {
 	Image            string
 }
 
+// (used for sending sruct to frontend)
+type frontendAlbumPlaylist struct {
+	ID      string
+	Name    string
+	Artists string
+	URL     string
+	Image   string
+	Owner   string
+	Tracks  int
+}
+
 type userLocation struct {
 	Name    string
 	URL     string

@@ -469,8 +469,14 @@ func tracks(c *gin.Context) {
 	defer func() {
 		pl := c.Query("pl")
 		playlistID := spotify.ID(pl)
-		// use the client to make calls that require authorization
-		plTracks, err := spotifyClient.GetPlaylistTracks(playlistID)
+		options := new(spotify.Options)
+		session := sessions.Default(c)
+		land := session.Get("country")
+		if land != nil {
+			country := land.(string)
+			options.Country = &country
+		}
+		plTracks, err := spotifyClient.GetPlaylistTracksOpt(playlistID, options, "")
 		if err != nil {
 			log.Panic(err)
 			c.String(http.StatusNotFound, err.Error())
@@ -494,21 +500,13 @@ func tracks(c *gin.Context) {
 				log.Println(err.Error())
 			}
 		}
-		type playlist struct {
-			ID     string
-			Name   string
-			Owner  string
-			URL    string
-			Image  string
-			Tracks uint
-		}
-		var pls playlist
+		var pls frontendAlbumPlaylist
 		plist, err := spotifyClient.GetPlaylist(playlistID)
 		pls.Name = plist.Name
 		pls.Owner = plist.Owner.DisplayName
 		pls.URL = plist.ExternalURLs["spotify"]
 		pls.Image = plist.Images[0].URL
-		pls.Tracks = uint(plist.Tracks.Total)
+		pls.Tracks = plist.Tracks.Total
 
 		c.HTML(
 			http.StatusOK,
@@ -532,30 +530,28 @@ func playlists(c *gin.Context) {
 	}
 
 	defer func() {
-		type playlist struct {
-			ID     string
-			Name   string
-			Owner  string
-			URL    string
-			Image  string
-			Tracks uint
+		options := new(spotify.Options)
+		session := sessions.Default(c)
+		land := session.Get("country")
+		if land != nil {
+			country := land.(string)
+			options.Country = &country
 		}
-		// use the client to make calls that require authorization
-		pages, err := spotifyClient.CurrentUsersPlaylists()
+		pages, err := spotifyClient.CurrentUsersPlaylistsOpt(options)
 		if err != nil {
 			log.Panic(err)
 			c.String(http.StatusNotFound, err.Error())
 		}
-		var pls []playlist
+		var pls []frontendAlbumPlaylist
 		for page := 1; ; page++ {
 			for _, item := range pages.Playlists {
-				var pl playlist
+				var pl frontendAlbumPlaylist
 				pl.ID = item.ID.String()
 				pl.Name = item.Name
 				pl.Owner = item.Owner.DisplayName
 				pl.URL = item.ExternalURLs["spotify"]
 				pl.Image = item.Images[0].URL
-				pl.Tracks = item.Tracks.Total
+				pl.Tracks = int(item.Tracks.Total)
 				pls = append(pls, pl)
 			}
 			err = spotifyClient.NextPage(pages)
@@ -585,14 +581,6 @@ func albumTracks(c *gin.Context) {
 	}
 
 	defer func() {
-		type albums struct {
-			ID      string
-			Name    string
-			Artists string
-			URL     string
-			Image   string
-			Tracks  int
-		}
 		al := c.Query("al")
 		albumID := spotify.ID(al)
 		// use the client to make calls that require authorization
@@ -618,7 +606,7 @@ func albumTracks(c *gin.Context) {
 				log.Println(err.Error())
 			}
 		}
-		var alb albums
+		var alb frontendAlbumPlaylist
 		album, err := spotifyClient.GetAlbum(albumID)
 		alb.Name = album.Name
 		alb.URL = album.ExternalURLs["spotify"]
@@ -646,24 +634,22 @@ func albums(c *gin.Context) {
 	}
 
 	defer func() {
-		// use the client to make calls that require authorization
-		userAlbums, err := spotifyClient.CurrentUsersAlbums()
+		options := new(spotify.Options)
+		session := sessions.Default(c)
+		land := session.Get("country")
+		if land != nil {
+			country := land.(string)
+			options.Country = &country
+		}
+		userAlbums, err := spotifyClient.CurrentUsersAlbumsOpt(options)
 		if err != nil {
 			log.Panic(err)
 			c.String(http.StatusNotFound, err.Error())
 		}
-		type albums struct {
-			ID      string
-			Name    string
-			Artists string
-			URL     string
-			Image   string
-			Tracks  int
-		}
-		var als []albums
+		var als []frontendAlbumPlaylist
 		for page := 1; ; page++ {
 			for _, item := range userAlbums.Albums {
-				var al albums
+				var al frontendAlbumPlaylist
 				al.ID = item.ID.String()
 				al.Name = item.Name
 				al.Artists = joinArtists(item.Artists, ", ")
