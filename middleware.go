@@ -45,12 +45,12 @@ func Headers() gin.HandlerFunc {
 	}
 }
 
-var limiterSet = cache.New(5*time.Minute, 10*time.Minute)
+var limiterSet = cache.New(15*time.Minute, 3*time.Minute)
 
-/*NewRateLimiter -a in-memory middleware to limit access rate
+/*RateLimiter -a in-memory middleware to limit access rate
 by custom key and rate
 */
-func NewRateLimiter(key func(*gin.Context) string, createLimiter func(*gin.Context) (*rate.Limiter, time.Duration),
+func RateLimiter(key func(*gin.Context) string, createLimiter func(*gin.Context) (*rate.Limiter, time.Duration),
 	abort func(*gin.Context)) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		k := key(c)
@@ -62,7 +62,7 @@ func NewRateLimiter(key func(*gin.Context) string, createLimiter func(*gin.Conte
 		}
 		ok = limiter.(*rate.Limiter).Allow()
 		if !ok {
-			abort(c)
+			c.Abort()
 			return
 		}
 		c.Next()

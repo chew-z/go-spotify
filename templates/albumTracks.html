@@ -2,6 +2,14 @@
 
 <!--Embed the header.html template at this location-->
 {{ template "header.html" .}}
+<nav aria-label="breadcrumb">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="/">Home</a></li>
+    <li class="breadcrumb-item"><a href="/albums">Albums</a></li>
+    <li class="breadcrumb-item active" aria-current="page">{{ .Album.Name }}</li>
+  </ol>
+</nav>
+
 <div class="container mw-50">
     <div class="card mb-3" style="max-width: 18rem;">
         <div class="card-body">
