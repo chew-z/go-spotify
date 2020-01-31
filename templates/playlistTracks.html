@@ -2,6 +2,7 @@
 
 <!--Embed the header.html template at this location-->
 {{ template "header.html" .}}
+
 <div class="container mw-50">
     <div class="card mb-3" style="max-width: 18rem;">
         <div class="card-body">
@@ -10,18 +11,18 @@
         </div>
         <div class="embed-responsive embed-responsive-1by1">
             <a href="{{ .Playlist.URL }}?utm_campaign=music.suka.yoga">
-                <img src="{{ .Playlist.Image}}" alt="{{ .Playlist.Name }}" class="card-img-top embed-responsive-item img-thumbnail">
+                <img src="{{ .Playlist.Image }}" alt="{{ .Playlist.Name }}" class="card-img-top embed-responsive-item img-thumbnail">
             </a>
         </div>
     </div>
 </div>
 
 <div class="container">
-    <div class="card-columns">
+      <div class="card-columns">
         {{range .Tracks }}
         <div class="card" style="max-width: 14rem;">
             <a href="{{ .URL }}?utm_campaign=music.suka.yoga">
-                <img class="card-img" style="object-fit: cover;" src="{{ .Image }}" alt="{{ .Name }}">
+                <img class="card-img" style="object-fit: cover;" src="{{ .Image}}" loading="lazy" alt="{{ .Name }}">
             </a>
             <div class="card-body">
                 <h5 class="card-title"><a href="{{ .URL }}?utm_campaign=music.suka.yoga">{{.Name}}</a></h5>

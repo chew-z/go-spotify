@@ -8,7 +8,7 @@
         {{range .Tracks }}
         <div class="card"> 
             <a href="{{ .URL }}?utm_campaign=music.suka.yoga">
-                <img class="card-img-top" style="object-fit: cover;" src="{{ .Image }}" alt="{{ .Name }}">
+                <img class="card-img-top" style="object-fit: cover;" src="{{ .Image }}" loading="lazy" alt="{{ .Name }}">
             </a>
             <div class="card-body"> 
                 <h3 class="card-title">{{ .Count }}</h3>

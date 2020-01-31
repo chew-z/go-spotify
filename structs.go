@@ -49,12 +49,13 @@ type recommendationParameters struct {
 
 // TODO - its just tracks now, not topTracks
 type topTrack struct {
-	Count   int
-	Name    string
-	Artists string
-	URL     string
-	Album   string
-	Image   string
+	Count       int
+	Name        string
+	Artists     string
+	URL         string
+	Album       string
+	Image       string
+	Placeholder string
 }
 
 type audioTrack struct {
@@ -72,13 +73,14 @@ type audioTrack struct {
 
 // (used for sending sruct to frontend)
 type frontendAlbumPlaylist struct {
-	ID      string
-	Name    string
-	Artists string
-	URL     string
-	Image   string
-	Owner   string
-	Tracks  int
+	ID          string
+	Name        string
+	Artists     string
+	URL         string
+	Image       string
+	Placeholder string
+	Owner       string
+	Tracks      int
 }
 
 type userLocation struct {
