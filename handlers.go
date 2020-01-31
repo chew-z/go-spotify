@@ -30,8 +30,7 @@ var (
 	// Warning token will fail if you are changing scope (even if you narrow it down) so you might end up with bunch
 	// of useless stored tokens that will keep failing
 	// TODO - procedure for clearing useless token (users will have to re-authorize with Spotify)
-	auth = spotify.NewAuthenticator(redirectURI, spotify.ScopeUserReadPrivate, spotify.ScopeUserTopRead, spotify.ScopeUserLibraryRead, spotify.ScopeUserFollowRead, spotify.ScopeUserReadRecentlyPlayed, spotify.ScopePlaylistModifyPublic, spotify.ScopePlaylistModifyPrivate)
-	// clientChannel = make(chan *spotify.Client)
+	auth = spotify.NewAuthenticator(redirectURI, spotify.ScopeUserReadPrivate, spotify.ScopeUserTopRead, spotify.ScopeUserLibraryRead, spotify.ScopeUserFollowRead, spotify.ScopeUserReadRecentlyPlayed, spotify.ScopePlaylistModifyPublic, spotify.ScopePlaylistModifyPrivate, spotify.ScopePlaylistReadCollaborative, spotify.ScopePlaylistReadPrivate) // clientChannel = make(chan *spotify.Client)
 )
 
 /* statefull authorization handler using channels
