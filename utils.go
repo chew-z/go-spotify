@@ -62,7 +62,7 @@ func fullTrackGetMany(spotifyClient *spotify.Client, ids []spotify.ID) ([]spotif
 	for _, chunkIDs := range chunks {
 		pointerTracks, err := spotifyClient.GetTracks(chunkIDs...)
 		if err != nil {
-			return tracks, fmt.Errorf("Failed to get many tracks: %v", err)
+			log.Printf("Failed to get many tracks: %s", err.Error())
 		}
 		for _, track := range pointerTracks {
 			tracks = append(tracks, *track)

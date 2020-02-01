@@ -444,6 +444,9 @@ func chart(c *gin.Context) {
 				c.String(http.StatusNotFound, err.Error())
 			}
 			for _, item := range tracks.Tracks {
+				if item.Track.ID == "" {
+					continue
+				}
 				trackID := item.Track.ID
 				trackIDs = append(trackIDs, trackID)
 			}
@@ -461,6 +464,9 @@ func chart(c *gin.Context) {
 				c.String(http.StatusNotFound, err.Error())
 			}
 			for _, item := range tracks.Tracks {
+				if item.ID == "" {
+					continue
+				}
 				trackID := item.ID
 				trackIDs = append(trackIDs, trackID)
 			}
@@ -545,6 +551,9 @@ func playlistTracks(c *gin.Context) {
 		for {
 			for _, item := range plTracks.Tracks {
 				var tt topTrack
+				if item.Track.ID == "" {
+					continue
+				}
 				tt.Name = item.Track.Name
 				tt.Album = item.Track.Album.Name
 				tt.Artists = joinArtists(item.Track.Artists, ", ")
@@ -665,6 +674,9 @@ func albumTracks(c *gin.Context) {
 		var tracks []topTrack
 		for {
 			for _, item := range alTracks.Tracks {
+				if item.ID == "" {
+					continue
+				}
 				var tt topTrack
 				tt.Name = item.Name
 				tt.Artists = joinArtists(item.Artists, ", ")
