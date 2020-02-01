@@ -434,6 +434,8 @@ func chart(c *gin.Context) {
 			offset, _ := strconv.Atoi(page)
 			offset = offset * pageLimit
 			options.Offset = &offset
+			limit := pageLimit
+			options.Limit = &limit
 			fields := "items(track(id))"
 			itemsID := spotify.ID(pl)
 			tracks, err := spotifyClient.GetPlaylistTracksOpt(itemsID, options, fields)
@@ -445,10 +447,10 @@ func chart(c *gin.Context) {
 				trackID := item.Track.ID
 				trackIDs = append(trackIDs, trackID)
 			}
-			if len(tracks.Tracks) <= pageLimit {
+			if len(tracks.Tracks) < pageLimit {
 				nav.Next = ""
 			}
-			nav.Back = fmt.Sprintf("/tracks?pl=%s", pl)
+			nav.Back = fmt.Sprintf("/playlisttracks?pl=%s", pl)
 		} else if al != "" {
 			itemsID := spotify.ID(al)
 			offset, _ := strconv.Atoi(page)
@@ -462,7 +464,7 @@ func chart(c *gin.Context) {
 				trackID := item.ID
 				trackIDs = append(trackIDs, trackID)
 			}
-			if len(tracks.Tracks) <= pageLimit {
+			if len(tracks.Tracks) < pageLimit {
 				nav.Next = ""
 			}
 			nav.Back = fmt.Sprintf("/albumtracks?al=%s", al)
@@ -491,7 +493,6 @@ func chart(c *gin.Context) {
 			}
 			nav.Back = "/history"
 		}
-		nav.Endpoint = endpoint
 		data := miniAudioFeatures(trackIDs, spotifyClient) // uses pageLimit
 		c.SetCookie("lastPage", page, 1200, endpoint, "", false, true)
 		c.HTML(
@@ -509,14 +510,18 @@ func chart(c *gin.Context) {
 /* tracks - display tracks for a playlist
  */
 func playlistTracks(c *gin.Context) {
+	endpoint := c.Request.URL.Path
+	page := c.Query("page")
+	pl := c.Query("pl")
+	nav := getNavigation(page)
+
 	spotifyClient := clientMagic(c)
 	if spotifyClient == nil {
 		c.JSON(http.StatusTeapot, gin.H{"message": "failed to find  client"})
 		return
 	}
 
-	defer func() {
-		pl := c.Query("pl")
+	{
 		playlistID := spotify.ID(pl)
 		options := new(spotify.Options)
 		session := sessions.Default(c)
@@ -525,7 +530,13 @@ func playlistTracks(c *gin.Context) {
 			country := land.(string)
 			options.Country = &country
 		}
-		plTracks, err := spotifyClient.GetPlaylistTracksOpt(playlistID, options, "")
+		offset, _ := strconv.Atoi(page)
+		offset = offset * pageLimit
+		options.Offset = &offset
+		limit := pageLimit
+		options.Limit = &limit
+		fields := "items.track(id,name,album(name,images),artists)"
+		plTracks, err := spotifyClient.GetPlaylistTracksOpt(playlistID, options, fields)
 		if err != nil {
 			log.Panic(err)
 			c.String(http.StatusNotFound, err.Error())
@@ -562,16 +573,19 @@ func playlistTracks(c *gin.Context) {
 		pls.Image = plist.Images[0].URL
 		pls.Tracks = plist.Tracks.Total
 
+		nav.Back = "/playlists"
+		nav.Endpoint = endpoint
 		c.HTML(
 			http.StatusOK,
 			"playlistTracks.html",
 			gin.H{
-				"Tracks":   tracks,
-				"Playlist": pls,
-				"title":    "Tracks",
+				"Tracks":     tracks,
+				"Playlist":   pls,
+				"Navigation": nav,
+				"title":      "Tracks",
 			},
 		)
-	}()
+	}
 }
 
 /* playlists - display some of user's playlists
@@ -604,7 +618,12 @@ func playlists(c *gin.Context) {
 				pl.Name = item.Name
 				pl.Owner = item.Owner.DisplayName
 				pl.URL = item.ExternalURLs["spotify"]
-				pl.Image = item.Images[0].URL
+				if len(item.Images) > 0 {
+					pl.Image = item.Images[0].URL
+				} else {
+					pl.Image = "/static/generic_album_cover.png"
+				}
+
 				pl.Tracks = int(item.Tracks.Total)
 				pls = append(pls, pl)
 			}

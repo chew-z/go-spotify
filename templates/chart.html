@@ -8,15 +8,11 @@
 <script src="https://www.chartjs.org/samples/latest/utils.js"></script>
 <h4 class="display-4">{{ .title }}</h4>
 
-<!-- <div class="container"> -->
-<!-- <ul class="pagination justify-content-end"> -->
-<!--     {{ with .Navigation }} -->
-<!--     <li class="page-item"><a class="page-link" href="/chart?p={{ .Previous }}">Previous</a></li> -->
-<!--     <li class="page-item"><a class="page-link" href="/chart?p={{ .Next }}">Next</a></li> -->
-<!--     {{ end }} -->
-<!-- </ul> -->
-<!-- </div> -->
 {{ template "pageNav.html" .}}
+<div class="container d-flex justify-content-end">
+    <a onclick="addUrlParameter('chart', 'radar.html')" class="btn btn-light btn-sm btn-lg active" role="button" aria-pressed="true">Radar</a>
+</div>
+
 <div class="container">
     <div class="card-columns">
         {{ range .Data }}
@@ -40,16 +36,12 @@ var chartColors = window.chartColors;
 var color = Chart.helpers.color;
 var ctx = document.getElementById('{{ .ID }}').getContext('2d');
 var chart = new Chart(ctx, {
-    // The type of chart we want to create
     type: 'polarArea',
-    // The data for our dataset
     data: {
         labels: ['Energy', 'Loudness', 'Tempo','Instrumentalness', 'Acousticness'],
         datasets: [
             {
                 label: '{{ .Name }}',
-                // backgroundColor: 'rgb(255, {{ .Loudness }}, {{ .Tempo }})',
-                // borderColor: 'rgb({{ .Energy }}, {{ .Instrumentalness }}, {{ .Acousticness }} )',
                 data: [ {{ .Energy}}, {{ .Loudness }}, {{ .Tempo }}, {{ .Instrumentalness }}, {{ .Acousticness }}],
                 backgroundColor: [
                         color(chartColors.red).alpha(0.5).rgbString(),
@@ -60,7 +52,6 @@ var chart = new Chart(ctx, {
                     ]
             }]
     },
-    // Configuration options go here
     options: {
         legend: {
             display: false
@@ -73,14 +64,5 @@ var chart = new Chart(ctx, {
     </div>
 </div>
 {{ template "pageNav.html" .}}
-<!-- <div class="container"> -->
-<!-- <ul class="pagination justify-content-end"> -->
-<!--     {{ with .Navigation }} -->
-<!--     <li class="page-item"><a class="page-link" href="/chart?p={{ .Previous }}">Previous</a></li> -->
-<!--     <li class="page-item"><a class="page-link" href="/chart?p={{ .Next }}">Next</a></li> -->
-<!--     {{ end }} -->
-<!-- </ul> -->
-<!-- </div> -->
-
 <!--Embed the footer.html template at this location-->
 {{ template "footer.html" .}}

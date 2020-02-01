@@ -1,22 +1,29 @@
 <!--pageNav.html-->
 <div class="container">
+    <script>
+function addUrlParameter(name, value) {
+    let searchParams = new URLSearchParams(window.location.search)
+    searchParams.set(name, value)
+    window.location.search = searchParams.toString()
+}
+    </script>
     <nav aria-label="Page navigation">
         {{ with .Navigation }}
         <ul class="pagination justify-content-end">
             <li class="page-item {{ if not .Previous }}disabled{{ end}}">
-                <a class="page-link" href="{{ .Endpoint }}?page={{ .Previous }}" aria-label="Previous">
+                <a class="page-link" onclick="addUrlParameter('page', {{ .Previous }})" aria-label="Previous">
                     <span aria-hidden="true">&laquo;</span>
                     <span class="sr-only">Previous</span>
                 </a>
             </li>
             {{ if .Previous }}
-            <li class="page-item"><a class="page-link" href="{{ .Endpoint }}?page={{ .Previous }}">{{ .Previous }}</a></li>
+            <li class="page-item"><a class="page-link" onclick="addUrlParameter('page', {{ .Previous }})">{{ .Previous }}</a></li>
             {{ end }}
-            <li class="page-item"><a class="page-link" href="{{ .Endpoint }}?page={{ .Current }}">{{ .Current }}</a></li>
+            <li class="page-item"><a class="page-link" onclick="addUrlParameter('page', {{ .Current }})">{{ .Current }}</a></li>
             {{ if .Next }}
-            <li class="page-item"><a class="page-link" href="{{ .Endpoint }}?page={{ .Next }}">{{ .Next }}</a></li>
+            <li class="page-item"><a class="page-link" onclick="addUrlParameter('page', {{ .Next }})">{{ .Next }}</a></li>
             <li class="page-item">
-                <a class="page-link" href="{{ .Endpoint }}?page={{ .Next }}" aria-label="Next">
+                <a class="page-link" onclick="addUrlParameter('page', {{ .Next}})" aria-label="Next">
                     <span aria-hidden="true">&raquo;</span>
                     <span class="sr-only">Next</span>
                 </a>
@@ -26,5 +33,4 @@
         {{ end }}
     </nav>
 </div>
-
 

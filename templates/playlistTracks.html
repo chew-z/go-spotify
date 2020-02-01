@@ -25,6 +25,7 @@
     </div>
 </div>
 
+{{ template "pageNav.html" .}}
 <div class="container">
     <div class="card-columns">
         {{range .Tracks }}
@@ -40,5 +41,6 @@
         {{end}}
     </div>
 </div>
+{{ template "pageNav.html" .}}
 <!--Embed the footer.html template at this location-->
 {{ template "footer.html" .}}

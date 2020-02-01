@@ -54,8 +54,8 @@ func init() {
 	server := &http.Server{
 		Addr:         ":8080",
 		Handler:      router,
-		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 10 * time.Second,
+		ReadTimeout:  30 * time.Second,
+		WriteTimeout: 30 * time.Second,
 		IdleTimeout:  90 * time.Second,
 	}
 	// Process the templates at the start so that they don't have to be loaded
