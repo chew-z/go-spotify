@@ -29,6 +29,7 @@ function addUrlParameter(name, value) {
     <li class="page-item"><a class="page-link" onclick="addUrlParameter('page', {{ .Previous }})">{{ .Previous }}</a></li>
     {{ end }}
     <li class="page-item"><a class="page-link" onclick="addUrlParameter('page', {{ .Current }})">{{ .Current }}</a></li>
+    {{ if .Next }}
     <li class="page-item"><a class="page-link" onclick="addUrlParameter('page', {{ .Next }})">{{ .Next }}</a></li>
     <li class="page-item">
         <a class="page-link" onclick="addUrlParameter('page', {{ .Next}})" aria-label="Next">
@@ -36,6 +37,7 @@ function addUrlParameter(name, value) {
         <span class="sr-only">Next</span>
       </a>
     </li>
+    {{ end }}
   </ul>
     {{ end }}
 </nav>

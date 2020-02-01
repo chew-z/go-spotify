@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -237,6 +238,10 @@ func popular(c *gin.Context) {
 	c.JSON(http.StatusTeapot, gin.H{"/popular": "failed to find  client"})
 }
 
+/*charts - present audio features for tracks from history
+as radar or pie. History tracks are taken form firestore rather
+then directly from spotify history.
+*/
 func charts(c *gin.Context) {
 	endpoint := c.Request.URL.Path
 	page := c.Query("page")
@@ -456,6 +461,82 @@ func user(c *gin.Context) {
 	c.String(http.StatusTeapot, "I am a teapot, that's all I know")
 }
 
+/*plCharts - like charts but for album/playlist
+and data are taken form spotify not firestore
+*/
+func plCharts(c *gin.Context) {
+	endpoint := c.Request.URL.Path
+	page := c.Query("page")
+	chart := c.DefaultQuery("chart", "pie.html")
+	pl := c.Query("pl")
+	al := c.Query("al")
+	nav := getNavigation(page)
+
+	spotifyClient := clientMagic(c)
+	if spotifyClient == nil {
+		c.JSON(http.StatusTeapot, gin.H{endpoint: "failed to get Spotify client"})
+		return
+	}
+	{
+		trackIDs := []spotify.ID{}
+		if pl != "" {
+			options := new(spotify.Options)
+			session := sessions.Default(c)
+			land := session.Get("country")
+			if land != nil {
+				country := land.(string)
+				options.Country = &country
+			}
+			offset, _ := strconv.Atoi(page)
+			offset = offset * pageLimit
+			options.Offset = &offset
+			fields := "items(track(id))"
+			itemsID := spotify.ID(pl)
+			tracks, err := spotifyClient.GetPlaylistTracksOpt(itemsID, options, fields)
+			if err != nil {
+				log.Println(err.Error())
+				c.String(http.StatusNotFound, err.Error())
+			}
+			for _, item := range tracks.Tracks {
+				trackID := item.Track.ID
+				trackIDs = append(trackIDs, trackID)
+			}
+			if len(tracks.Tracks) <= pageLimit {
+				nav.Next = ""
+			}
+			nav.Back = fmt.Sprintf("/tracks?pl=%s", pl)
+		} else if al != "" {
+			itemsID := spotify.ID(al)
+			offset, _ := strconv.Atoi(page)
+			offset = offset * pageLimit
+			tracks, err := spotifyClient.GetAlbumTracksOpt(itemsID, pageLimit, offset)
+			if err != nil {
+				log.Println(err.Error())
+				c.String(http.StatusNotFound, err.Error())
+			}
+			for _, item := range tracks.Tracks {
+				trackID := item.ID
+				trackIDs = append(trackIDs, trackID)
+			}
+			if len(tracks.Tracks) <= pageLimit {
+				nav.Next = ""
+			}
+			nav.Back = fmt.Sprintf("/albumtracks?al=%s", al)
+		}
+		data := miniAudioFeatures(trackIDs, spotifyClient) // uses pageLimit
+		c.SetCookie("lastPage", page, 1200, endpoint, "", false, true)
+		c.HTML(
+			http.StatusOK,
+			chart, //TODO - pie or radar
+			gin.H{
+				"title":      "Chart",
+				"Navigation": nav,
+				"Data":       data,
+			},
+		)
+	}
+}
+
 /* tracks - display tracks for a playlist
  */
 func tracks(c *gin.Context) {
@@ -481,14 +562,18 @@ func tracks(c *gin.Context) {
 			c.String(http.StatusNotFound, err.Error())
 		}
 		var tracks []topTrack
-		for page := 1; ; page++ {
+		for {
 			for _, item := range plTracks.Tracks {
 				var tt topTrack
 				tt.Name = item.Track.Name
 				tt.Album = item.Track.Album.Name
 				tt.Artists = joinArtists(item.Track.Artists, ", ")
 				tt.URL = item.Track.ExternalURLs["spotify"]
-				tt.Image = item.Track.Album.Images[0].URL
+				if len(item.Track.Album.Images) > 0 {
+					tt.Image = item.Track.Album.Images[0].URL
+				} else {
+					tt.Image = "/static/generic_album_cover.png"
+				}
 				tracks = append(tracks, tt)
 			}
 			err = spotifyClient.NextPage(plTracks)
@@ -501,6 +586,7 @@ func tracks(c *gin.Context) {
 		}
 		var pls frontendAlbumPlaylist
 		plist, err := spotifyClient.GetPlaylist(playlistID)
+		pls.ID = plist.ID.String()
 		pls.Name = plist.Name
 		pls.Owner = plist.Owner.DisplayName
 		pls.URL = plist.ExternalURLs["spotify"]
@@ -542,7 +628,7 @@ func playlists(c *gin.Context) {
 			c.String(http.StatusNotFound, err.Error())
 		}
 		var pls []frontendAlbumPlaylist
-		for page := 1; ; page++ {
+		for {
 			for _, item := range pages.Playlists {
 				var pl frontendAlbumPlaylist
 				pl.ID = item.ID.String()
@@ -589,7 +675,7 @@ func albumTracks(c *gin.Context) {
 			c.String(http.StatusNotFound, err.Error())
 		}
 		var tracks []topTrack
-		for page := 1; ; page++ {
+		for {
 			for _, item := range alTracks.Tracks {
 				var tt topTrack
 				tt.Name = item.Name
@@ -607,6 +693,7 @@ func albumTracks(c *gin.Context) {
 		}
 		var alb frontendAlbumPlaylist
 		album, err := spotifyClient.GetAlbum(albumID)
+		alb.ID = album.ID.String()
 		alb.Name = album.Name
 		alb.URL = album.ExternalURLs["spotify"]
 		alb.Image = album.Images[0].URL

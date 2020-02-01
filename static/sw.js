@@ -2,7 +2,7 @@
 console.log('Service Worker [registerd**]');
 
 const cacheName = 'go-spotify';
-const filesToCache = ['/', '/static/index.js'];
+const filesToCache = ['/', '/static/index.js', '/static/share_button.svg', '/static/generic_album_cover.png'];
 
 self.addEventListener('install', (e) => {
     console.log('[ServiceWorker**] Install');

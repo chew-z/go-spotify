@@ -3,11 +3,11 @@
 <!--Embed the header.html template at this location-->
 {{ template "header.html" .}}
 <nav aria-label="breadcrumb">
-  <ol class="breadcrumb">
-    <li class="breadcrumb-item"><a href="/">Home</a></li>
-    <li class="breadcrumb-item"><a href="/playlists">Playlists</a></li>
-    <li class="breadcrumb-item active" aria-current="page">{{ .Playlist.Name }}</li>
-  </ol>
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="/">Home</a></li>
+        <li class="breadcrumb-item"><a href="/playlists">Playlists</a></li>
+        <li class="breadcrumb-item active" aria-current="page">{{ .Playlist.Name }}</li>
+    </ol>
 </nav>
 
 <div class="container mw-50">
@@ -21,11 +21,12 @@
                 <img src="{{ .Playlist.Image }}" alt="{{ .Playlist.Name }}" class="card-img-top embed-responsive-item img-thumbnail">
             </a>
         </div>
+        <a href="/playlistchart?pl={{ .Playlist.ID }}" class="btn btn-secondary btn-sm active" role="button" aria-pressed="true">Tracks audio attributes</a>
     </div>
 </div>
 
 <div class="container">
-      <div class="card-columns">
+    <div class="card-columns">
         {{range .Tracks }}
         <div class="card" style="max-width: 14rem;">
             <a href="{{ .URL }}?utm_campaign=music.suka.yoga">

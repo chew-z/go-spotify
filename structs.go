@@ -38,6 +38,9 @@ type navigation struct {
 	Previous string
 	Current  string
 	Next     string
+	Back     string
+	Here     string
+	Title    string
 }
 
 type recommendationParameters struct {

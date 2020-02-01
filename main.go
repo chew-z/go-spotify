@@ -70,8 +70,8 @@ func init() {
 	router.Use(RateLimiter(func(c *gin.Context) string {
 		return c.ClientIP() // limit rate by client ip
 	}, func(c *gin.Context) (*rate.Limiter, time.Duration) {
-		return rate.NewLimiter(25.0, 50), time.Hour // limit 25  qps/clientIp
-		// and permit bursts of at most 50 tokens, and the limiter liveness time duration is 1 hour
+		return rate.NewLimiter(20.0, 40), time.Hour // limit 20 queries/ second / clientIp
+		// and permit bursts of at most 40, and the limiter liveness time duration is 1 hour
 	}, func(c *gin.Context) {
 		c.AbortWithStatus(429) // handle exceed rate limit request
 	}))
@@ -96,15 +96,16 @@ func init() {
 		authorized.GET("/chart", charts)
 		authorized.GET("/history", history)
 		authorized.GET("/mood", moodFromHistory)
+		authorized.GET("/playlists", playlists)
+		authorized.GET("/tracks", tracks)
+		authorized.GET("/albums", albums)
+		authorized.GET("/albumtracks", albumTracks)
 		authorized.GET("/user", user)
 		// HIDDEN from menu
 		authorized.GET("/logout", logout)
 		// TODO - make useful
-		authorized.GET("/tracks", tracks)
-		authorized.GET("/albumtracks", albumTracks)
-		authorized.GET("/playlists", playlists)
-		authorized.GET("/albums", albums)
 		// TXT pages TODO
+		authorized.GET("/playlistchart", plCharts)
 		authorized.GET("/artists", artists)
 		authorized.GET("/search", search)
 		authorized.GET("/recommend", recommend)
