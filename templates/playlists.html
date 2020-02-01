@@ -2,25 +2,21 @@
 
 <!--Embed the header.html template at this location-->
 {{ template "header.html" .}}
-<!-- <p> -->
-<!--   {{with .Email}}You are currently logged in as {{.}}.{{end}} -->
-<!--   {{with .Login}}<a href="{{.}}">Sign in</a>{{end}} -->
-<!--   {{with .Logout}}<a href="{{.}}">Sign out</a>{{end}} -->
-<!-- </p> -->
 <h4 class="display-4">{{ .title }}</h4>
 <div class="container">
     <div class="card-columns">
         {{range .Playlists }}
         <div class="card">
-            <!-- <div class="card-header"> <strong><a href="{{ .URL }}">{{ .Name }}</a></strong> -->
-            <!-- </div> -->
-            <a href="/tracks?pl={{ .ID }}">
-                <img class="card-img-top" style="object-fit: scale-down;" src="{{ .Image }}" loading="lazy" alt="{{ .Name }}">
+            <a href="{{ .URL}}?utm_campaign=music.suka.yoga">
+                <picture>
+                    <source media="(min-width: 320px)" srcset="{{ .Image }}">
+                    <img class="card-img-top" style="object-fit: cover;" src="/static/generic_album_cover.png" loading="lazy" alt="{{ .Name }}">
+                </picture>
             </a>
             <div class="card-body"> 
                 <h5 class="card-title"><a href="{{ .URL }}">{{.Name}}</a></h5>
                 <p class="card-text">{{.Owner}}</em></p>
-                <a href="/tracks?pl={{ .ID }}" class="btn btn-outline-info">{{ .Tracks }} tracks</a>
+                <a href="/playlisttracks?pl={{ .ID }}" class="btn btn-outline-info">{{ .Tracks }} tracks</a>
             </div>
         </div>
         {{end}}

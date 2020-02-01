@@ -93,19 +93,18 @@ func init() {
 		// HTML pages
 		authorized.GET("/top", top)
 		authorized.GET("/popular", popular)
-		authorized.GET("/chart", charts)
+		authorized.GET("/chart", chart)
 		authorized.GET("/history", history)
 		authorized.GET("/mood", moodFromHistory)
 		authorized.GET("/playlists", playlists)
-		authorized.GET("/tracks", tracks)
 		authorized.GET("/albums", albums)
-		authorized.GET("/albumtracks", albumTracks)
 		authorized.GET("/user", user)
 		// HIDDEN from menu
 		authorized.GET("/logout", logout)
+		authorized.GET("/playlisttracks", playlistTracks)
+		authorized.GET("/albumtracks", albumTracks)
 		// TODO - make useful
 		// TXT pages TODO
-		authorized.GET("/playlistchart", plCharts)
 		authorized.GET("/artists", artists)
 		authorized.GET("/search", search)
 		authorized.GET("/recommend", recommend)

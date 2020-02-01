@@ -238,64 +238,6 @@ func popular(c *gin.Context) {
 	c.JSON(http.StatusTeapot, gin.H{"/popular": "failed to find  client"})
 }
 
-/*charts - present audio features for tracks from history
-as radar or pie. History tracks are taken form firestore rather
-then directly from spotify history.
-*/
-func charts(c *gin.Context) {
-	endpoint := c.Request.URL.Path
-	page := c.Query("page")
-	chart := c.DefaultQuery("chart", "pie.html")
-	nav := getNavigation(page)
-
-	spotifyClient := clientMagic(c)
-	if spotifyClient == nil {
-		c.JSON(http.StatusTeapot, gin.H{endpoint: "failed to get Spotify client"})
-		return
-	}
-	{
-		session := sessions.Default(c)
-		user := session.Get("user")
-		if user == nil {
-			u, err := spotifyClient.CurrentUser()
-			if err != nil {
-				log.Println(err.Error())
-				c.JSON(http.StatusTeapot, gin.H{endpoint: "failed to get Spotify user"})
-				return
-			}
-			user = string(u.ID)
-		}
-		path := fmt.Sprintf("users/%s/recently_played", user)
-		q := paginateHistory(page, path, c)
-		docs, err := q.Documents(ctx).GetAll()
-		if err != nil {
-			log.Println(err.Error())
-		}
-		lastDoc := docs[len(docs)-1].Data()["played_at"].(time.Time)
-		c.SetCookie("lastDoc", lastDoc.String(), 1200, endpoint, "", false, true)
-		c.SetCookie("lastPage", page, 1200, endpoint, "", false, true)
-		trackIDs := []spotify.ID{}
-		for _, doc := range docs {
-			trackID := spotify.ID(doc.Ref.ID)
-			trackIDs = append(trackIDs, trackID)
-		}
-
-		data := miniAudioFeatures(trackIDs, spotifyClient)
-		if err != nil {
-			log.Println(err.Error())
-		}
-		c.HTML(
-			http.StatusOK,
-			chart, //TODO - pie or radar
-			gin.H{
-				"title":      "Chart",
-				"Navigation": nav,
-				"Data":       data,
-			},
-		)
-	}
-}
-
 /* history - read saved tracks from Cloud Firestore database
  */
 func history(c *gin.Context) {
@@ -338,6 +280,7 @@ func history(c *gin.Context) {
 				tracks = append(tracks, tr)
 			}
 		}
+		nav.Endpoint = endpoint
 		c.HTML(
 			http.StatusOK,
 			"history.html",
@@ -461,10 +404,11 @@ func user(c *gin.Context) {
 	c.String(http.StatusTeapot, "I am a teapot, that's all I know")
 }
 
-/*plCharts - like charts but for album/playlist
-and data are taken form spotify not firestore
+/*chart - present audio features for tracks from history/album/playlist
+as radar or pie. History tracks are taken form firestore rather
+then directly from spotify history.
 */
-func plCharts(c *gin.Context) {
+func chart(c *gin.Context) {
 	endpoint := c.Request.URL.Path
 	page := c.Query("page")
 	chart := c.DefaultQuery("chart", "pie.html")
@@ -478,10 +422,10 @@ func plCharts(c *gin.Context) {
 		return
 	}
 	{
+		session := sessions.Default(c)
 		trackIDs := []spotify.ID{}
 		if pl != "" {
 			options := new(spotify.Options)
-			session := sessions.Default(c)
 			land := session.Get("country")
 			if land != nil {
 				country := land.(string)
@@ -522,7 +466,32 @@ func plCharts(c *gin.Context) {
 				nav.Next = ""
 			}
 			nav.Back = fmt.Sprintf("/albumtracks?al=%s", al)
+		} else {
+			user := session.Get("user")
+			if user == nil {
+				u, err := spotifyClient.CurrentUser()
+				if err != nil {
+					log.Println(err.Error())
+					c.JSON(http.StatusTeapot, gin.H{endpoint: "failed to get Spotify user"})
+					return
+				}
+				user = string(u.ID)
+			}
+			path := fmt.Sprintf("users/%s/recently_played", user)
+			q := paginateHistory(page, path, c)
+			docs, err := q.Documents(ctx).GetAll()
+			if err != nil {
+				log.Println(err.Error())
+			}
+			lastDoc := docs[len(docs)-1].Data()["played_at"].(time.Time)
+			c.SetCookie("lastDoc", lastDoc.String(), 1200, endpoint, "", false, true)
+			for _, doc := range docs {
+				trackID := spotify.ID(doc.Ref.ID)
+				trackIDs = append(trackIDs, trackID)
+			}
+			nav.Back = "/history"
 		}
+		nav.Endpoint = endpoint
 		data := miniAudioFeatures(trackIDs, spotifyClient) // uses pageLimit
 		c.SetCookie("lastPage", page, 1200, endpoint, "", false, true)
 		c.HTML(
@@ -539,7 +508,7 @@ func plCharts(c *gin.Context) {
 
 /* tracks - display tracks for a playlist
  */
-func tracks(c *gin.Context) {
+func playlistTracks(c *gin.Context) {
 	spotifyClient := clientMagic(c)
 	if spotifyClient == nil {
 		c.JSON(http.StatusTeapot, gin.H{"message": "failed to find  client"})
