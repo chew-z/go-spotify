@@ -26,7 +26,7 @@ function onShare() {
 
 function initializeApp() {
     if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('./static/sw.js').then(() => {
+        navigator.serviceWorker.register('/sw.js').then(() => {
             document.querySelector('#share_button').addEventListener('click', () => {
                 onShare();
             });
@@ -36,11 +36,14 @@ function initializeApp() {
 
 initializeApp();
 
-
-$( document ).ready(function() {
+$(document).ready(function() {
     if (navigator.share) {
-        $("#share_button").removeClass("d-none").addClass("d-block");
+        $('#share_button')
+            .removeClass('d-none')
+            .addClass('d-block');
     } else {
-        $("#share_button").removeClass("d-block").addClass("d-none");
+        $('#share_button')
+            .removeClass('d-block')
+            .addClass('d-none');
     }
 });

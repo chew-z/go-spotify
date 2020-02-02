@@ -64,8 +64,7 @@ func init() {
 	router.Use(Headers()) // Custom headers middleware
 	router.Static("/static", "./static")
 	router.StaticFile("/favicon.ico", "./static/favicon.ico")
-	router.StaticFile("/apple-touch-icon.png", "./static/apple-touch-icon.png")
-	router.StaticFile("/apple-touch-icon-precomposed.png", "./static/apple-touch-icon-precomposed.png")
+	router.StaticFile("/sw.js", "./static/sw.js")
 	// In real world we need rate limiting
 	router.Use(RateLimiter(func(c *gin.Context) string {
 		return c.ClientIP() // limit rate by client ip
