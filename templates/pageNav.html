@@ -3,16 +3,16 @@
     <nav aria-label="Page navigation">
         {{ with .Navigation }}
         <ul class="pagination justify-content-end">
+            {{ if .Previous }}
             <li class="page-item {{ if not .Previous }}disabled{{ end}}">
                 <a class="page-link" onclick="addUrlParameter('page', {{ .Previous }})" aria-label="Previous">
                     <span aria-hidden="true">&laquo;</span>
                     <span class="sr-only">Previous</span>
                 </a>
             </li>
-            {{ if .Previous }}
             <li class="page-item"><a class="page-link" onclick="addUrlParameter('page', {{ .Previous }})">{{ .Previous }}</a></li>
-            {{ end }}
             <li class="page-item"><a class="page-link" onclick="addUrlParameter('page', {{ .Current }})">{{ .Current }}</a></li>
+            {{ end }}
             {{ if .Next }}
             <li class="page-item"><a class="page-link" onclick="addUrlParameter('page', {{ .Next }})">{{ .Next }}</a></li>
             <li class="page-item">

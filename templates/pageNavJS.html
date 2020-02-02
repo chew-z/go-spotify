@@ -8,27 +8,38 @@ function addUrlParameter(name, value) {
 }
 let container = document.querySelector('.container');
 let options = {
-    minHorizontal: 15, // Minimum number of pixels traveled to count as a horizontal swipe.
+    minHorizontal: 25, // Minimum number of pixels traveled to count as a horizontal swipe.
     minVertical: 25, // Minimum number of pixels traveled to count as a vertical swipe.
     deltaHorizontal: 5, // Delta for horizontal swipe
     deltaVertical: 5, // Delta for vertical swipe
-    preventScroll: true, // Prevents scrolling when swiping.
+    preventScroll: false, // Prevents scrolling when swiping.
     lockAxis: true, // Select only one axis to be true instead of multiple.
     touch: true, // Listen for touch events
-    mouse: true // Listen for mouse events
+    mouse: false// Listen for mouse events
 };
 let listener = SwipeListener(container, options);
 container.addEventListener('swipe', function (e) {
     let directions = e.detail.directions;
 
+    {{ with .Navigation }}
+    {{ if .Previous }}
     if (directions.left) {
-        addUrlParameter('page', {{ .Navigation.Previous }})
+        addUrlParameter('page', {{ .Previous }})
     }
+    {{ end }}
+    {{ if .Next }}
     if (directions.right) {
-        addUrlParameter('page', {{ .Navigation.Next }})
+        addUrlParameter('page', {{ .Next }})
     }
-    if (directions.top) {
+    {{ end }}
+    {{ else }}
+    if (directions.left) {
         window.history.back();
     }
+    if (directions.right) {
+        window.history.forward();
+    }
+    {{ end }}
+
 });
 </script> 
