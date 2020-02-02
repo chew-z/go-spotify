@@ -2,8 +2,14 @@
 
 <!--Embed the header.html template at this location-->
 {{ template "header.html" .}}
-<h4 class="display-4">Hello World! This is go-spotify here.</h4>
-
+<div class="container">
+    <a href="/user">
+        <picture>
+            <source srcset="/static/music.svg" type="image/svg+xml">
+            <img src="/static/generic_album_cover.png" class="img-fluid rounded mx-auto d-block" alt="...">
+        </picture>
+    </a>
+</div>
 <!--Share button-->
 {{ template "sharing.html" }}
 <!--Embed the footer.html template at this location-->

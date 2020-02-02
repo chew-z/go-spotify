@@ -16,7 +16,7 @@
 
 <div class="container-fluid">
     {{ with .User }}
-    <h4 class="display-4">You are logged in as <a href="{{ .URL }}">{{ .Name }}</a>.</h4>
+    <h6 class="display-4">You are logged in as <a href="{{ .URL }}">{{ .Name }}</a>.</h6>
     <p class="lead">Your Spotify account is from <strong>{{ .Country }}</strong></p>
     {{ end }}
     <p>Your timezone is probably <mark id="timezone"></mark> and the time is <strong id="time"></strong>
