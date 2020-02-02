@@ -260,8 +260,6 @@ func history(c *gin.Context) {
 			}
 			user = string(u.ID)
 		}
-		// tz := session.Get("timezone").(string)
-		// loc, _ := time.LoadLocation(tz)
 		path := fmt.Sprintf("users/%s/recently_played", user)
 		q := paginateHistory(page, path, c)
 		docs, err := q.Documents(ctx).GetAll()
@@ -558,11 +556,7 @@ func playlistTracks(c *gin.Context) {
 				tt.Album = item.Track.Album.Name
 				tt.Artists = joinArtists(item.Track.Artists, ", ")
 				tt.URL = item.Track.ExternalURLs["spotify"]
-				if len(item.Track.Album.Images) > 0 {
-					tt.Image = item.Track.Album.Images[0].URL
-				} else {
-					tt.Image = "/static/generic_album_cover.png"
-				}
+				tt.Image = item.Track.Album.Images[0].URL
 				tracks = append(tracks, tt)
 			}
 			err = spotifyClient.NextPage(plTracks)
@@ -600,6 +594,10 @@ func playlistTracks(c *gin.Context) {
 /* playlists - display some of user's playlists
  */
 func playlists(c *gin.Context) {
+	endpoint := c.Request.URL.Path
+	page := c.Query("page")
+	nav := getNavigation(page)
+
 	spotifyClient := clientMagic(c)
 	if spotifyClient == nil {
 		c.JSON(http.StatusTeapot, gin.H{"message": "failed to find  client"})
@@ -608,48 +606,44 @@ func playlists(c *gin.Context) {
 
 	defer func() {
 		options := new(spotify.Options)
-		session := sessions.Default(c)
-		land := session.Get("country")
-		if land != nil {
-			country := land.(string)
-			options.Country = &country
-		}
+		offset, _ := strconv.Atoi(page)
+		offset = offset * pageLimit
+		options.Offset = &offset
+		limit := pageLimit
+		options.Limit = &limit
 		pages, err := spotifyClient.CurrentUsersPlaylistsOpt(options)
 		if err != nil {
 			log.Panic(err)
 			c.String(http.StatusNotFound, err.Error())
 		}
 		var pls []frontendAlbumPlaylist
-		for {
-			for _, item := range pages.Playlists {
-				var pl frontendAlbumPlaylist
-				pl.ID = item.ID.String()
-				pl.Name = item.Name
-				pl.Owner = item.Owner.DisplayName
-				pl.URL = item.ExternalURLs["spotify"]
-				if len(item.Images) > 0 {
-					pl.Image = item.Images[0].URL
-				} else {
-					pl.Image = "/static/generic_album_cover.png"
-				}
-
-				pl.Tracks = int(item.Tracks.Total)
-				pls = append(pls, pl)
-			}
-			err = spotifyClient.NextPage(pages)
-			if err == spotify.ErrNoMorePages {
-				break
-			}
-			if err != nil {
-				log.Println(err.Error())
-			}
+		//		for {
+		for _, item := range pages.Playlists {
+			var pl frontendAlbumPlaylist
+			pl.ID = item.ID.String()
+			pl.Name = item.Name
+			pl.Owner = item.Owner.DisplayName
+			pl.URL = item.ExternalURLs["spotify"]
+			pl.Image = item.Images[0].URL
+			pl.Tracks = int(item.Tracks.Total)
+			pls = append(pls, pl)
 		}
+		// err = spotifyClient.NextPage(pages)
+		// if err == spotify.ErrNoMorePages {
+		// 	break
+		// }
+		// if err != nil {
+		// 	log.Println(err.Error())
+		// }
+		// }
+		nav.Endpoint = endpoint
 		c.HTML(
 			http.StatusOK,
 			"playlists.html",
 			gin.H{
-				"Playlists": pls,
-				"title":     "Playlists",
+				"title":      "Playlists",
+				"Playlists":  pls,
+				"Navigation": nav,
 			},
 		)
 	}()
