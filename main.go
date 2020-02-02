@@ -63,7 +63,7 @@ func init() {
 	router.LoadHTMLGlob("templates/*")
 	router.Use(Headers()) // Custom headers middleware
 	router.Static("/static", "./static")
-	router.StaticFile("/favicon.ico", "./favicon.ico")
+	router.StaticFile("/favicon.ico", "./static/favicon.ico")
 	router.StaticFile("/apple-touch-icon.png", "./static/apple-touch-icon.png")
 	router.StaticFile("/apple-touch-icon-precomposed.png", "./static/apple-touch-icon-precomposed.png")
 	// In real world we need rate limiting

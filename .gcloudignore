@@ -2,6 +2,7 @@ README.md
 .gitignore
 .git/**
 bin/**
+static.bak/**
 CloudFunctions/**
 token.json
 init.sh

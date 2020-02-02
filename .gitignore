@@ -9,6 +9,7 @@ init.sh
 gcrgc.sh
 *.sh
 favicon.png
+static.bak/**
 bin/**
 *.bak
 *.bak.go
