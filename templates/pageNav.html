@@ -1,27 +1,5 @@
 <!--pageNav.html-->
-<script src="https://unpkg.com/swipe-listener@latest/dist/swipe-listener.min.js" type="text/javascript"></script>
 <div class="container">
-    <script>
-function addUrlParameter(name, value) {
-    let searchParams = new URLSearchParams(window.location.search)
-    searchParams.set(name, value)
-    window.location.search = searchParams.toString()
-}
-    </script>
-    <script>
-var container = document.querySelector('.container');
-var listener = SwipeListener(container);
-container.addEventListener('swipe', function (e) {
-    var directions = e.detail.directions;
-
-    if (directions.left) {
-        addUrlParameter('page', {{ .Navigation.Previous }})
-    }
-    if (directions.right) {
-        addUrlParameter('page', {{ .Navigation.Next }})
-    }
-});
-    </script>
     <nav aria-label="Page navigation">
         {{ with .Navigation }}
         <ul class="pagination justify-content-end">

@@ -3,6 +3,8 @@
 <!--Embed the header.html template at this location-->
 {{ template "header.html" .}}
 <h4 class="display-4">{{ .title }}</h4>
+{{ template "pageNavJS.html" .}}
+{{ template "pageNav.html" .}}
 <div class="container">
     <div class="card-columns">
         {{range .Albums }}
@@ -22,5 +24,6 @@
         {{end}}
     </div>
 </div>
+{{ template "pageNav.html" .}}
 <!--Embed the footer.html template at this location-->
 {{ template "footer.html" .}}

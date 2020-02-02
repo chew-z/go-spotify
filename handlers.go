@@ -604,7 +604,7 @@ func playlists(c *gin.Context) {
 		return
 	}
 
-	defer func() {
+	{
 		options := new(spotify.Options)
 		offset, _ := strconv.Atoi(page)
 		offset = offset * pageLimit
@@ -617,7 +617,6 @@ func playlists(c *gin.Context) {
 			c.String(http.StatusNotFound, err.Error())
 		}
 		var pls []frontendAlbumPlaylist
-		//		for {
 		for _, item := range pages.Playlists {
 			var pl frontendAlbumPlaylist
 			pl.ID = item.ID.String()
@@ -628,25 +627,17 @@ func playlists(c *gin.Context) {
 			pl.Tracks = int(item.Tracks.Total)
 			pls = append(pls, pl)
 		}
-		// err = spotifyClient.NextPage(pages)
-		// if err == spotify.ErrNoMorePages {
-		// 	break
-		// }
-		// if err != nil {
-		// 	log.Println(err.Error())
-		// }
-		// }
 		nav.Endpoint = endpoint
 		c.HTML(
 			http.StatusOK,
 			"playlists.html",
 			gin.H{
 				"title":      "Playlists",
-				"Playlists":  pls,
 				"Navigation": nav,
+				"Playlists":  pls,
 			},
 		)
-	}()
+	}
 }
 
 func albumTracks(c *gin.Context) {
@@ -707,13 +698,17 @@ func albumTracks(c *gin.Context) {
 /* albums - display some of user's albums
  */
 func albums(c *gin.Context) {
+	endpoint := c.Request.URL.Path
+	page := c.Query("page")
+	nav := getNavigation(page)
+
 	spotifyClient := clientMagic(c)
 	if spotifyClient == nil {
 		c.JSON(http.StatusTeapot, gin.H{"message": "failed to find  client"})
 		return
 	}
 
-	defer func() {
+	{
 		options := new(spotify.Options)
 		session := sessions.Default(c)
 		land := session.Get("country")
@@ -721,41 +716,40 @@ func albums(c *gin.Context) {
 			country := land.(string)
 			options.Country = &country
 		}
+		offset, _ := strconv.Atoi(page)
+		offset = offset * pageLimit
+		options.Offset = &offset
+		limit := pageLimit
+		options.Limit = &limit
+
 		userAlbums, err := spotifyClient.CurrentUsersAlbumsOpt(options)
 		if err != nil {
 			log.Panic(err)
 			c.String(http.StatusNotFound, err.Error())
 		}
 		var als []frontendAlbumPlaylist
-		for page := 1; ; page++ {
-			for _, item := range userAlbums.Albums {
-				var al frontendAlbumPlaylist
-				al.ID = item.ID.String()
-				al.Name = item.Name
-				al.Artists = joinArtists(item.Artists, ", ")
-				al.URL = item.ExternalURLs["spotify"]
-				al.Image = item.Images[0].URL
-				al.Tracks = item.Tracks.Total
-				als = append(als, al)
-			}
-			err = spotifyClient.NextPage(userAlbums)
-			if err == spotify.ErrNoMorePages {
-				break
-			}
-			if err != nil {
-				log.Println(err.Error())
-			}
-
+		for _, item := range userAlbums.Albums {
+			var al frontendAlbumPlaylist
+			al.ID = item.ID.String()
+			al.Name = item.Name
+			al.Artists = joinArtists(item.Artists, ", ")
+			al.URL = item.ExternalURLs["spotify"]
+			al.Image = item.Images[0].URL
+			al.Tracks = item.Tracks.Total
+			als = append(als, al)
 		}
+		nav.Back = "/playlists"
+		nav.Endpoint = endpoint
 		c.HTML(
 			http.StatusOK,
 			"albums.html",
 			gin.H{
-				"Albums": als,
-				"title":  "Albums",
+				"title":      "Albums",
+				"Navigation": nav,
+				"Albums":     als,
 			},
 		)
-	}()
+	}
 }
 
 /* -------- TODO - everything below has to change or go -------- */
