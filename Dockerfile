@@ -37,7 +37,7 @@ COPY --from=builder /go/src/cloudrun/spotify/go-spotify /go-spotify
 # Copy templates, static and such
 COPY templates templates/
 COPY static static/
-COPY favicon.ico .
+# COPY favicon.ico .
 COPY robots.txt .
 # For firebase (not really picked up in CloudRun)
 COPY .firebase-credentials.json ./
