@@ -8,12 +8,8 @@
         <title>{{ .title }}</title>
         <meta charset="utf-8"/>
         <meta name="Description" content="Companion app for Spotify - music discovery and analysis.">
-        <link rel="manifest" href="/static/site.webmanifest">
-        <meta name="mobile-web-app-capable" content="yes">
-        <meta name="mobile-web-app-status-bar-style" content="green">
-        <meta name="mobile-web-app-title" content="music.suka.yoga">
-        {{ template "icons.html" .}}
-        {{ template "splashscreen.html" .}}
+        {{ template "mobile.html" .}}
+        {{ template "apple.html" .}}
         <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
         <script defer src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js" integrity="sha384-UO2eT0CpHqdSJQ6hJty5KVphtPhzWj9WO1clHTMGa3JDZwrnQq4sF86dIHNDz0W1" crossorigin="anonymous"></script>
         <script defer src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js" integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM" crossorigin="anonymous"></script>
