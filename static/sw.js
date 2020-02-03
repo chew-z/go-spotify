@@ -1,8 +1,7 @@
 // Service Worker
 console.log('Service Worker [registerd**]');
 
-const cacheName = 'go-spotify';
-const filesToCache = [
+const urlsToCache = [
     '/static/index.js',
     '/static/music.svg',
     '/static/share_button.svg',
@@ -11,37 +10,44 @@ const filesToCache = [
     '/static/android-icon-192x192.png',
     '/static/android-icon-512x512.png',
 ];
+const CACHE_NAME = 'go-spotify-v1';
 
-self.addEventListener('install', (e) => {
-    console.log('[ServiceWorker**] Install');
-    e.waitUntil(
-        caches.open(cacheName).then((cache) => {
-            console.log('[ServiceWorker**] Caching app shell');
+const cacheResources = async () => {
+    const cache = await caches.open(CACHE_NAME);
 
-            return cache.addAll(filesToCache);
-        }),
-    );
+    return cache.addAll(urlsToCache);
+};
+
+self.addEventListener('install', async (e) => {
+    self.skipWaiting();
+    e.waitUntil(cacheResources());
 });
 
-self.addEventListener('activate', (event) => {
-    caches.keys().then((keyList) => {
-        return Promise.all(
-            keyList.map((key) => {
-                if (key !== cacheName) {
-                    console.log('[ServiceWorker] Removing old cache', key);
+const clearOldCache = async () => {
+    const cacheNames = await caches.keys();
+    const oldCacheName = cacheNames.find((name) => name !== CACHE_NAME);
+    // Feature-detect
+    if (self.registration.navigationPreload) {
+        // Enable navigation preloads!
+        await self.registration.navigationPreload.enable();
+    }
+    caches.delete(oldCacheName);
+};
 
-                    return caches.delete(key);
-                }
-            }),
-        );
-    });
+self.addEventListener('activate', (e) => {
+    e.waitUntil(clearOldCache());
 });
 
-self.addEventListener('fetch', (event) => {
-    console.log(event.request.url);
-    event.respondWith(
-        caches.match(event.request, { ignoreSearch: true }).then((response) => {
-            return response || fetch(event.request);
-        }),
-    );
+const getResponseByRequest = async (e) => {
+    const cache = await caches.open(CACHE_NAME);
+    const cachedResponse = await cache.match(e.request);
+    // Else, use the preloaded response, if it's there
+    const preloadedResponse = await e.preloadResponse;
+
+    return cachedResponse || preloadedResponse || fetch(e.request);
+};
+
+self.addEventListener('fetch', (e) => {
+    console.log(e.request.url);
+    e.respondWith(getResponseByRequest(e));
 });

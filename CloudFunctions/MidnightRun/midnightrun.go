@@ -10,23 +10,8 @@ import (
 	"time"
 
 	"cloud.google.com/go/firestore"
-	"golang.org/x/oauth2"
 	"google.golang.org/api/iterator"
 )
-
-type firestoreToken struct {
-	user     string        // Spotify user ID
-	country  string        // The country of the user, as set in the user's account profile
-	timezone string        // TODO let user set timezone
-	path     string        // authorization path (gin routes group)
-	token    *oauth2.Token // Spotify token
-}
-
-type firestoreUser struct {
-	id       string `firestore:"userID"`
-	timezone string `firestore:"timezone,omitempty"`
-	country  string `firestore:"country,omitempty"`
-}
 
 var (
 	firestoreClient *firestore.Client
@@ -34,7 +19,6 @@ var (
 )
 
 func main() {
-	defer firestoreClient.Close()
 }
 
 func init() {
@@ -53,7 +37,7 @@ midnight. But no hassle to run it by hand.
 PS. The movie Midnight Run is great https://youtu.be/LF8cT6ivlr4
 */
 func MidnightRun(w http.ResponseWriter, r *http.Request) {
-	var newTok firestoreToken
+	defer firestoreClient.Close()
 	trackCounter := 0
 	userCounter := 0
 	iter := firestoreClient.Collection("users").Documents(ctx)
@@ -65,9 +49,7 @@ func MidnightRun(w http.ResponseWriter, r *http.Request) {
 	for _, doc := range docs {
 		user := doc.Data()["userID"].(string) // legit would to read data and get userID
 		log.Printf("user: %s", user)
-		newTok.user = user
-		newTok.path = "/user"
-		batchSize := 24
+		batchSize := 50
 		path := fmt.Sprintf("users/%s/recently_played", user)
 		ref := firestoreClient.Collection(path).Where("played_at", "<", time.Now().AddDate(0, 0, -7)) // 7 days
 		for {
@@ -89,6 +71,7 @@ func MidnightRun(w http.ResponseWriter, r *http.Request) {
 				numDeleted++
 			}
 			trackCounter += numDeleted
+			log.Printf("Deleted: %d", numDeleted)
 			// If there are no documents to delete, the process is over.
 			if numDeleted == 0 {
 				break
@@ -100,7 +83,6 @@ func MidnightRun(w http.ResponseWriter, r *http.Request) {
 				log.Panic(err)
 			}
 		}
-		//--------------------------------
 		userCounter++
 		log.Printf("Processed %d tracks for %d users", trackCounter, userCounter)
 	}
@@ -121,17 +103,4 @@ func initFirestoreDatabase(ctx context.Context) *firestore.Client {
 		log.Panic(err)
 	}
 	return firestoreClient
-}
-
-func getTokenFromDB(token *firestoreToken) (*oauth2.Token, error) {
-	path := fmt.Sprintf("users/%s/tokens%s", token.user, token.path)
-	dsnap, err := firestoreClient.Doc(path).Get(ctx)
-	if err != nil {
-		log.Printf("Error retrieving token from Firestore for %s %s.\nPossibly it ain't there..", path, err.Error())
-		return nil, err
-	}
-	tok := &oauth2.Token{}
-	dsnap.DataTo(tok)
-	token.token = tok
-	return tok, nil
 }

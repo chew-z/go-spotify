@@ -8,7 +8,7 @@ import (
 
 	"cloud.google.com/go/firestore"
 	spotify "github.com/chew-z/spotify"
-	"github.com/gin-gonic/contrib/sessions"
+	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 	"google.golang.org/api/iterator"
 )

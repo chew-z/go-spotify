@@ -12,7 +12,7 @@ import (
 	"cloud.google.com/go/firestore"
 	spotify "github.com/chew-z/spotify"
 	"github.com/coreos/go-oidc"
-	"github.com/gin-gonic/contrib/sessions"
+	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 	"github.com/patrickmn/go-cache"
 	"golang.org/x/oauth2"
@@ -149,8 +149,8 @@ func saveTokenToDB(token *firestoreToken) {
 	// TODO - two set operations - ?
 	_, err := firestoreClient.Doc(path).Set(ctx, token.token)
 	_, err = firestoreClient.Collection("users").Doc(token.user).Set(ctx, map[string]interface{}{
-		"userID":  token.user,
-		"country": token.country,
+		"userID":          token.user,
+		"country":         token.country,
 		"account_created": time.Now(),
 	}, firestore.MergeAll)
 	if err != nil {

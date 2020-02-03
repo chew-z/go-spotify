@@ -2,12 +2,9 @@
 
 <!--Embed the header.html template at this location-->
 {{ template "header.html" .}}
-<div class="jumbotron ">
-    <a href="/user">
-        <picture>
-            <source srcset="/static/music.svg" type="image/svg+xml">
-            <img src="/static/generic_album_cover.png" class="img-fluid rounded mx-auto d-block" alt="...">
-        </picture>
+<div class="jumbotron jumbotron-fluid">
+    <a class="btn btn-outline-success btn-lg btn-block" href="/user">
+            <img src="/static/music.svg" class="img-fluid" style="object-fit: cover;" alt="music.suka.yoga">
     </a>
 </div>
 <!--Share button-->

@@ -8,12 +8,13 @@ import (
 	"time"
 
 	"cloud.google.com/go/firestore"
-	"github.com/gin-gonic/contrib/sessions"
+	"github.com/gin-contrib/sessions"
+	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
 	"golang.org/x/time/rate"
 )
 
-const sessionTimeout = 3600
+const sessionTimeout = 24 * 3600 // Session cookie timeout
 
 var (
 	firestoreClient *firestore.Client
@@ -44,7 +45,7 @@ func init() {
 	}()
 
 	firestoreClient = initFirestoreDatabase(ctx)
-	store := sessions.NewCookieStore([]byte(sessionSecret))
+	store := cookie.NewStore([]byte(sessionSecret))
 
 	router := gin.Default()
 	router.Use(sessions.Sessions("go-spotify", store))
@@ -52,24 +53,25 @@ func init() {
 	// http.ListenAndServe and http.ListenAndServeTLS, comes with no timeouts.
 	// You don't want that.
 	server := &http.Server{
-		Addr:         ":8080",
-		Handler:      router,
-		ReadTimeout:  30 * time.Second,
-		WriteTimeout: 30 * time.Second,
-		IdleTimeout:  90 * time.Second,
+		Addr:              ":8080",
+		Handler:           router,
+		ReadHeaderTimeout: 3 * time.Second,
+		ReadTimeout:       15 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       90 * time.Second,
 	}
 	// Process the templates at the start so that they don't have to be loaded
 	// from the disk again. This makes serving HTML pages very fast.
 	router.LoadHTMLGlob("templates/*")
 	router.Use(Headers()) // Custom headers middleware
 	router.Static("/static", "./static")
-	router.StaticFile("/favicon.ico", "./static/favicon.ico")
-	router.StaticFile("/sw.js", "./static/sw.js")
+	router.StaticFile("/favicon.ico", "./static/favicon.ico") // some clients don't read webmanifest
+	router.StaticFile("/sw.js", "./static/sw.js")             // service worker must be served from root
 	// In real world we need rate limiting
 	router.Use(RateLimiter(func(c *gin.Context) string {
 		return c.ClientIP() // limit rate by client ip
 	}, func(c *gin.Context) (*rate.Limiter, time.Duration) {
-		return rate.NewLimiter(20.0, 40), time.Hour // limit 20 queries/ second / clientIp
+		return rate.NewLimiter(20.0, 40), time.Hour // limit 20 queries/ second / client IP
 		// and permit bursts of at most 40, and the limiter liveness time duration is 1 hour
 	}, func(c *gin.Context) {
 		c.AbortWithStatus(429) // handle exceed rate limit request

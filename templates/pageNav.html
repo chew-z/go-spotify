@@ -1,5 +1,12 @@
 <!--pageNav.html-->
 <div class="container">
+    <script>
+function addUrlParameter(name, value) {
+    let searchParams = new URLSearchParams(window.location.search)
+    searchParams.set(name, value)
+    window.location.search = searchParams.toString()
+}
+    </script>
     <nav aria-label="Page navigation">
         {{ with .Navigation }}
         <ul class="pagination justify-content-end">

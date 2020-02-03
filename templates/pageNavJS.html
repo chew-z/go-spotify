@@ -1,11 +1,7 @@
 <!--pageNavJS.html-->
 <script src="https://unpkg.com/swipe-listener@latest/dist/swipe-listener.min.js" type="text/javascript"></script>
+
 <script>
-function addUrlParameter(name, value) {
-    let searchParams = new URLSearchParams(window.location.search)
-    searchParams.set(name, value)
-    window.location.search = searchParams.toString()
-}
 let container = document.querySelector('.container');
 let options = {
     minHorizontal: 25, // Minimum number of pixels traveled to count as a horizontal swipe.
