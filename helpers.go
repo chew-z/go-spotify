@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"strconv"
@@ -44,6 +45,9 @@ func recommendFromHistory(spotifyClient *spotify.Client, c *gin.Context) ([]spot
 		// 	log.Println(err.Error())
 		// 	return recommendedTracks, err
 		// }
+	}
+	if recentTracksIDs == nil {
+		return recommendedTracks, errors.New("History seems empty")
 	}
 	// get full tracks for track IDs
 	recentTracks, err := fullTrackGetMany(spotifyClient, recentTracksIDs)

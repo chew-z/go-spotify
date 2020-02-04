@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"net/http"
 	"reflect"
 	"strconv"
 	"strings"
@@ -237,6 +238,14 @@ func searchType(a string) spotify.SearchType {
 		return spotify.SearchTypeArtist
 	default:
 		return spotify.SearchTypeTrack
+	}
+}
+
+func cloudRecent(user string) {
+	cloudRecent := fmt.Sprintf("https://europe-west1-go-spotify-262707.cloudfunctions.net/CloudRecent?user=%s", user)
+	_, err := http.Get(cloudRecent)
+	if err != nil {
+		log.Println(err.Error())
 	}
 }
 
