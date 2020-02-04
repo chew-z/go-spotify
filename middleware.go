@@ -71,7 +71,7 @@ func RateLimiter(key func(*gin.Context) string, createLimiter func(*gin.Context)
 
 func recoveryHandler(c *gin.Context, err interface{}) {
 	log.Printf("%v", err)
-	c.HTML(500, "error.html", gin.H{
+	c.HTML(200, "error.html", gin.H{
 		"title": "Error",
 		"err":   err,
 	})

@@ -5,6 +5,7 @@ import (
 	"log"
 	"math"
 	"net/http"
+	"os"
 	"reflect"
 	"strconv"
 	"strings"
@@ -242,10 +243,15 @@ func searchType(a string) spotify.SearchType {
 }
 
 func cloudRecent(user string) {
-	cloudRecent := fmt.Sprintf("https://europe-west1-go-spotify-262707.cloudfunctions.net/CloudRecent?user=%s", user)
-	_, err := http.Get(cloudRecent)
+	url := os.Getenv("CLOUD_RECENT_FUNCTION")
+	token := getJWToken(url)
+	cloudRecent := fmt.Sprintf("%s?user=%s", url, user)
+	client := &http.Client{}
+	req, _ := http.NewRequest("GET", cloudRecent, nil)
+	req.Header.Add("Authorization", "Bearer "+token)
+	_, err := client.Do(req)
 	if err != nil {
-		log.Println(err.Error())
+		log.Fatal(err)
 	}
 }
 

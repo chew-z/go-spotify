@@ -60,8 +60,8 @@ func init() {
 		Addr:              ":8080",
 		Handler:           router,
 		ReadHeaderTimeout: 3 * time.Second,
-		ReadTimeout:       15 * time.Second,
-		WriteTimeout:      30 * time.Second,
+		ReadTimeout:       10 * time.Second,
+		WriteTimeout:      25 * time.Second,
 		IdleTimeout:       90 * time.Second,
 	}
 	// Install nice.Recovery, passing the handler to call after recovery
