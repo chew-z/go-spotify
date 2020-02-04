@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"cloud.google.com/go/firestore"
+	nice "github.com/ekyoung/gin-nice-recovery"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
@@ -47,7 +48,10 @@ func init() {
 	firestoreClient = initFirestoreDatabase(ctx)
 	store := cookie.NewStore([]byte(sessionSecret))
 
-	router := gin.Default()
+	// router := gin.Default()
+	router := gin.New()      // gin.Default() installs gin.Recovery() so use gin.New() instead
+	router.Use(gin.Logger()) // Install the default logger, not required
+
 	router.Use(sessions.Sessions("go-spotify", store))
 	// A zero/default http.Server, like the one used by the package-level helpers
 	// http.ListenAndServe and http.ListenAndServeTLS, comes with no timeouts.
@@ -60,6 +64,8 @@ func init() {
 		WriteTimeout:      30 * time.Second,
 		IdleTimeout:       90 * time.Second,
 	}
+	// Install nice.Recovery, passing the handler to call after recovery
+	router.Use(nice.Recovery(recoveryHandler))
 	// Process the templates at the start so that they don't have to be loaded
 	// from the disk again. This makes serving HTML pages very fast.
 	router.LoadHTMLGlob("templates/*")
@@ -80,6 +86,16 @@ func init() {
 	router.GET("/", func(c *gin.Context) {
 		c.HTML(http.StatusOK, "main.html", gin.H{
 			"title": "music.suka.yoga",
+		})
+	})
+	router.GET("/about", func(c *gin.Context) {
+		c.HTML(http.StatusOK, "about.html", gin.H{
+			"title": "About",
+		})
+	})
+	router.GET("/privacy", func(c *gin.Context) {
+		c.HTML(http.StatusOK, "privacy.html", gin.H{
+			"title": "Privacy",
 		})
 	})
 	router.GET("/callback", callback)

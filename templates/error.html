@@ -1,0 +1,13 @@
+<!--error.html-->
+
+<!--Embed the header.html template at this location-->
+{{ template "header.html" .}}
+<div class="alert alert-danger" role="alert">
+    <h4 class="alert-heading">{{ .title }}</h4>
+    <p>{{ .err }}</p>
+    <p class="mb-0">We apologize. Errors happen sometimes but you can probably safely ignore the error and just start over</p>
+</div>
+<!--Share button-->
+{{ template "sharing.html" }}
+<!--Embed the footer.html template at this location-->
+{{ template "footer.html" .}}

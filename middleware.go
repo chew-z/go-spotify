@@ -68,3 +68,10 @@ func RateLimiter(key func(*gin.Context) string, createLimiter func(*gin.Context)
 		c.Next()
 	}
 }
+
+func recoveryHandler(c *gin.Context, err interface{}) {
+	c.HTML(500, "error.html", gin.H{
+		"title": "Error",
+		"err":   err,
+	})
+}

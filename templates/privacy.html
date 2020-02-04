@@ -1,0 +1,19 @@
+<!--index.html-->
+
+<!--Embed the header.html template at this location-->
+{{ template "header.html" .}}
+<div class="jumbotron jumbotron-fluid">
+    <div class="container">
+        <h1 class="display-4">Privacy</h1>
+        <p class="lead">We are trying to keep data collection to minimum.</p>
+        <p>You are logging with your Spotify account and authorizing music.suka.yoga to access your account. This is neccessary for the app to have access to your albums, playlists, etc. but at any time you can go to <a href="https://www.spotify.com/us/account/apps/">Account overview</a> and remove access rights for our app.</p>
+        <p>We are watching the tracks that you have listened to and keep record in our database. It is mostly used to display the <a href="/history">History</a> of your listening and calculating popular tracks. We keep a week-long window of your history and erase data after 7 days.</p>
+        <p>We also store your Spotify ID, display name and your account country information. This information will be erased after you disconnect our app from your Spotify account.</p>
+        <p>We use cookies with shortest lifetime possible - usualy in minutes. Session cookies live 24 hours.</p>
+        <p>We do not place on your device third party cookies, tracking cookies, tracking scripts, analytics, tracking pixels etc.</p>
+    </div>
+</div>
+<!--Share button-->
+{{ template "sharing.html" }}
+<!--Embed the footer.html template at this location-->
+{{ template "footer.html" .}}
