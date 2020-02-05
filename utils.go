@@ -244,14 +244,14 @@ func searchType(a string) spotify.SearchType {
 
 func cloudRecent(user string) {
 	url := os.Getenv("CLOUD_RECENT_FUNCTION")
+	client := &http.Client{}
 	token := getJWToken(url)
 	cloudRecent := fmt.Sprintf("%s?user=%s", url, user)
-	client := &http.Client{}
 	req, _ := http.NewRequest("GET", cloudRecent, nil)
 	req.Header.Add("Authorization", "Bearer "+token)
 	_, err := client.Do(req)
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err.Error())
 	}
 }
 

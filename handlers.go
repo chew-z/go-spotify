@@ -99,6 +99,8 @@ func login(c *gin.Context) {
 		newTok.path = endpoint
 		newTok.token = newToken
 		saveTokenToDB(&newTok)
+		//Initialize history (don't wait) (must have token saved into firestore)
+		go cloudRecent(string(user.ID))
 		// save necessary variables into session
 		session := sessions.Default(c)
 		// TODO - is it necessary and what would be optimal?
@@ -112,10 +114,8 @@ func login(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, gin.H{"login": "failed to set session values"})
 			return
 		}
-		//Initialize history TODO - wrap it up and do only for single user
-		cloudRecent(string(user.ID))
 		url := fmt.Sprintf("http://%s%s", c.Request.Host, endpoint)
-		defer c.Redirect(http.StatusSeeOther, url)
+		c.Redirect(http.StatusSeeOther, url)
 		return
 	}
 	c.JSON(http.StatusTeapot, gin.H{"login": "failed to find cached client"})

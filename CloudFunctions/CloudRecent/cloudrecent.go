@@ -86,7 +86,6 @@ func CloudRecent(w http.ResponseWriter, r *http.Request) {
 			if errBatch != nil {
 				// Handle any errors in an appropriate way, such as returning them.
 				log.Printf("An error while commiting batch to firestore: %s", err.Error())
-				log.Panic(err)
 			}
 		}
 		log.Printf("Processed %d tracks for %d users", trackCounter, userCounter)
@@ -124,8 +123,8 @@ func CloudRecent(w http.ResponseWriter, r *http.Request) {
 		if errBatch != nil {
 			// Handle any errors in an appropriate way, such as returning them.
 			log.Printf("An error while commiting batch to firestore: %s", err.Error())
-			log.Panic(err)
 		}
+		log.Printf("Processed %d tracks for %s users", trackCounter, user)
 	}
 	w.WriteHeader(http.StatusOK)
 	response := "OK"

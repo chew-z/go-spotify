@@ -84,8 +84,8 @@ func MidnightRun(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		userCounter++
-		log.Printf("Processed %d tracks for %d users", trackCounter, userCounter)
 	}
+	log.Printf("Processed %d tracks for %d users", trackCounter, userCounter)
 	w.WriteHeader(http.StatusOK)
 	response := "Midnight Run - starring Robert DeNiro"
 	if err := json.NewEncoder(w).Encode(&response); err != nil {
