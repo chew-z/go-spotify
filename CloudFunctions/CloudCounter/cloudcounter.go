@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"cloud.google.com/go/firestore"
+	firebase "firebase.google.com/go"
 )
 
 // FirestoreEvent is the payload of a Firestore event.
@@ -48,16 +49,26 @@ type FirestoreValue struct {
 
 var (
 	firestoreClient *firestore.Client
-	ctx             = context.Background()
+	projectID       = os.Getenv("GOOGLE_CLOUD_PROJECT")
 )
 
 func main() {
-	defer firestoreClient.Close()
 }
 
 func init() {
+	// Use the application default credentials.
+	conf := &firebase.Config{ProjectID: projectID}
+	// Use context.Background() because the app/client should persist across
+	// invocations.
 	ctx := context.Background()
-	firestoreClient = initFirestoreDatabase(ctx)
+	app, err := firebase.NewApp(ctx, conf)
+	if err != nil {
+		log.Panicf("firebase.NewApp: %v", err)
+	}
+	firestoreClient, err = app.Firestore(ctx)
+	if err != nil {
+		log.Fatalf("app.Firestore: %v", err)
+	}
 }
 
 // CloudCounter is triggered by a change to a Firestore document.
@@ -86,11 +97,11 @@ func CloudCounter(ctx context.Context, e FirestoreEvent) error {
 /*initFirestoreDatabase - as the name says creates Firestore client
 in Google Cloud it is using project ID, on localhost credentials file
 */
-func initFirestoreDatabase(ctx context.Context) *firestore.Client {
-	// sa := option.WithCredentialsFile(".firebase-credentials.json")
-	firestoreClient, err := firestore.NewClient(ctx, os.Getenv("GOOGLE_CLOUD_PROJECT"))
-	if err != nil {
-		log.Panic(err)
-	}
-	return firestoreClient
-}
+// func initFirestoreDatabase(ctx context.Context) *firestore.Client {
+// 	// sa := option.WithCredentialsFile(".firebase-credentials.json")
+// 	firestoreClient, err := firestore.NewClient(ctx, os.Getenv("GOOGLE_CLOUD_PROJECT"))
+// 	if err != nil {
+// 		log.Panic(err)
+// 	}
+// 	return firestoreClient
+// }

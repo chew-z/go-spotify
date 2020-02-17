@@ -1,5 +1,5 @@
 // index.js
-function onShare() {
+async function onShare() {
     const { title } = 'Music';
     const url = document.querySelector('link[rel=canonical]')
         ? document.querySelector('link[rel=canonical]').href
@@ -7,20 +7,21 @@ function onShare() {
     const text = 'Look, I have found companion for Spotify!';
 
     if (navigator.share) {
-        navigator
-            .share({
+        try {
+            await navigator.share({
                 title,
                 url,
                 text,
-            })
-            .then(() => {
-                alert('Thanks for Sharing!');
-            })
-            .catch((err) => {
-                console.log(`Couldn't share ${err}`);
             });
+            alert('Thanks for Sharing!');
+        } catch (err) {
+            /*
+          This error will appear if the user cancel the action of sharing.
+        */
+            alert(`Couldn't share ${err}`);
+        }
     } else {
-        alert('Not supported !!');
+        console.log('Sharing not supported !!');
     }
 }
 
@@ -36,7 +37,7 @@ function initializeApp() {
 
 initializeApp();
 
-$(document).ready(function() {
+$(document).ready(() => {
     if (navigator.share) {
         $('#share_button')
             .removeClass('d-none')

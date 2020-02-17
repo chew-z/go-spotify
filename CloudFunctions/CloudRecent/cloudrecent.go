@@ -39,8 +39,6 @@ func init() {
 /*CloudRecent - ..
  */
 func CloudRecent(w http.ResponseWriter, r *http.Request) {
-	var client spotify.Client
-	var newTok firestoreToken
 	users, ok := r.URL.Query()["user"]
 	if !ok || len(users[0]) < 1 {
 		// Process all users
@@ -53,84 +51,64 @@ func CloudRecent(w http.ResponseWriter, r *http.Request) {
 		userCounter := 0
 		for _, doc := range docs {
 			user := doc.Data()["userID"].(string)
-			log.Printf("user: %s", user)
-			newTok.user = user
-			newTok.path = "/user"
-			tok, err := getTokenFromDB(&newTok)
-			if err != nil {
-				log.Println(err.Error())
-			}
-			client = auth.NewClient(tok)
-			recentlyPlayed, err := client.PlayerRecentlyPlayed()
-			if err != nil {
-				log.Panic(err)
-			}
-			// Get a new write batch.
-			path := fmt.Sprintf("users/%s/recently_played", user)
-			batch := firestoreClient.Batch()
-			for _, item := range recentlyPlayed {
-				artists := joinArtists(item.Track.Artists, ", ")
-				playedAt := item.PlayedAt
-				recentlyPlayedRef := firestoreClient.Collection(path).Doc(string(item.Track.ID))
-				batch.Set(recentlyPlayedRef, map[string]interface{}{
-					"played_at":  playedAt,
-					"track_name": item.Track.Name,
-					"artists":    artists,
-					"id":         string(item.Track.ID),
-				}, firestore.MergeAll) // Overwrite only the fields in the map; preserve all others.
-				trackCounter++
-			}
+			log.Printf("Multiple user: %s", user)
+			trackCounter += processUser(user)
 			userCounter++
-			// Commit the batch.
-			_, errBatch := batch.Commit(ctx)
-			if errBatch != nil {
-				// Handle any errors in an appropriate way, such as returning them.
-				log.Printf("An error while commiting batch to firestore: %s", err.Error())
-			}
 		}
 		log.Printf("Processed %d tracks for %d users", trackCounter, userCounter)
 	} else { // for single user
 		user := users[0]
-		log.Printf("user: %s", user)
-		newTok.user = user
-		newTok.path = "/user"
-		tok, err := getTokenFromDB(&newTok)
-		if err != nil {
-			log.Println(err.Error())
-		}
-		client = auth.NewClient(tok)
-		recentlyPlayed, err := client.PlayerRecentlyPlayed()
-		if err != nil {
-			log.Println(err.Error())
-		}
-		trackCounter := 0
-		path := fmt.Sprintf("users/%s/recently_played", user)
-		batch := firestoreClient.Batch()
-		for _, item := range recentlyPlayed {
-			artists := joinArtists(item.Track.Artists, ", ")
-			playedAt := item.PlayedAt
-			recentlyPlayedRef := firestoreClient.Collection(path).Doc(string(item.Track.ID))
-			batch.Set(recentlyPlayedRef, map[string]interface{}{
-				"played_at":  playedAt,
-				"track_name": item.Track.Name,
-				"artists":    artists,
-				"id":         string(item.Track.ID),
-			}, firestore.MergeAll) // Overwrite only the fields in the map; preserve all others.
-			trackCounter++
-		}
-		// Commit the batch.
-		_, errBatch := batch.Commit(ctx)
-		if errBatch != nil {
-			// Handle any errors in an appropriate way, such as returning them.
-			log.Printf("An error while commiting batch to firestore: %s", err.Error())
-		}
-		log.Printf("Processed %d tracks for %s users", trackCounter, user)
+		log.Printf("Single user: %s", user)
+		trackCounter := processUser(user)
+		log.Printf("Processed %d tracks for %s", trackCounter, user)
 	}
 	w.WriteHeader(http.StatusOK)
 	response := "OK"
 	if err := json.NewEncoder(w).Encode(&response); err != nil {
 		log.Println(err.Error())
 	}
+}
+
+func processUser(user string) int {
+	var spotifyClient spotify.Client
+	var newTok firestoreToken
+	trackCounter := 0
+
+	newTok.user = user
+	newTok.path = "/user"
+	tok, err := getTokenFromDB(&newTok)
+	if err != nil {
+		log.Println(err.Error())
+	}
+	spotifyClient = auth.NewClient(tok)
+	options := new(spotify.RecentlyPlayedOptions)
+	options.Limit = 25
+	recentlyPlayed, err := spotifyClient.PlayerRecentlyPlayedOpt(options)
+	if err != nil {
+		log.Panic(err)
+	}
+	// Get a new write batch.
+	path := fmt.Sprintf("users/%s/recently_played", user)
+	batch := firestoreClient.Batch()
+	for _, item := range recentlyPlayed {
+		artists := joinArtists(item.Track.Artists, ", ")
+		playedAt := item.PlayedAt
+		recentlyPlayedRef := firestoreClient.Collection(path).Doc(string(item.Track.ID))
+		batch.Set(recentlyPlayedRef, map[string]interface{}{
+			"played_at":  playedAt,
+			"track_name": item.Track.Name,
+			"artists":    artists,
+			"id":         string(item.Track.ID),
+		}, firestore.MergeAll) // Overwrite only the fields in the map; preserve all others.
+		trackCounter++
+	}
+	// Commit the batch.
+	_, errBatch := batch.Commit(ctx)
+	if errBatch != nil {
+		// Handle any errors in an appropriate way, such as returning them.
+		log.Printf("An error while commiting batch to firestore: %s", err.Error())
+	}
+	return trackCounter
 }
 
 func getTokenFromDB(token *firestoreToken) (*oauth2.Token, error) {
