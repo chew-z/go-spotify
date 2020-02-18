@@ -23,6 +23,7 @@ type firestoreToken struct {
 var (
 	ctx             = context.Background()
 	firestoreClient *firestore.Client
+	pageLimit       = 25
 	redirectURI     = os.Getenv("REDIRECT_URI")
 	auth            = spotify.NewAuthenticator(redirectURI, spotify.ScopeUserReadPrivate, spotify.ScopeUserTopRead, spotify.ScopeUserLibraryRead, spotify.ScopeUserFollowRead, spotify.ScopeUserReadRecentlyPlayed, spotify.ScopePlaylistModifyPublic, spotify.ScopePlaylistModifyPrivate)
 )
@@ -57,6 +58,7 @@ func CloudRecent(w http.ResponseWriter, r *http.Request) {
 		}
 		log.Printf("Processed %d tracks for %d users", trackCounter, userCounter)
 	} else { // for single user
+		pageLimit = 50
 		user := users[0]
 		log.Printf("Single user: %s", user)
 		trackCounter := processUser(user)
@@ -82,7 +84,7 @@ func processUser(user string) int {
 	}
 	spotifyClient = auth.NewClient(tok)
 	options := new(spotify.RecentlyPlayedOptions)
-	options.Limit = 25
+	options.Limit = pageLimit
 	recentlyPlayed, err := spotifyClient.PlayerRecentlyPlayedOpt(options)
 	if err != nil {
 		log.Panic(err)

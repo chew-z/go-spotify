@@ -149,9 +149,9 @@ func saveTokenToDB(token *firestoreToken) {
 	// TODO - two set operations - ?
 	_, err := firestoreClient.Doc(path).Set(ctx, token.token)
 	_, err = firestoreClient.Collection("users").Doc(token.user).Set(ctx, map[string]interface{}{
-		"userID":          token.user,
-		"country":         token.country,
-		"account_created": time.Now(),
+		"userID":      token.user,
+		"country":     token.country,
+		"token_saved": time.Now(), // account created or logged in new browser
 	}, firestore.MergeAll)
 	if err != nil {
 		log.Printf("saveToken: Error saving token for %s %s", token.path, err.Error())
@@ -174,7 +174,7 @@ func updateTokenInDB(token *firestoreToken) {
 		"TokenType":    token.token.TokenType,
 	}, firestore.MergeAll)
 	_, err = firestoreClient.Collection("users").Doc(token.user).Set(ctx, map[string]interface{}{
-		"last_seen": time.Now(),
+		"token_updated": time.Now(), // last time token had been refreshed
 	}, firestore.MergeAll)
 
 	if err != nil {

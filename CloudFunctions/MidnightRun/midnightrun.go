@@ -38,6 +38,37 @@ PS. The movie Midnight Run is great https://youtu.be/LF8cT6ivlr4
 */
 func MidnightRun(w http.ResponseWriter, r *http.Request) {
 	defer firestoreClient.Close()
+
+	ref := firestoreClient.Collection("users").Where("token_updated", "<", time.Now().AddDate(0, 0, -7)) // 7 days
+	for {
+		batchSize := 50
+		iter := ref.Limit(batchSize).Documents(ctx)
+		numDeleted := 0
+		batch := firestoreClient.Batch()
+		for {
+			iterDoc, err := iter.Next()
+			if err == iterator.Done {
+				break
+			}
+			if err != nil {
+				log.Println(err.Error())
+			}
+			batch.Delete(iterDoc.Ref)
+			numDeleted++
+		}
+		log.Printf("Deleted: %d users", numDeleted)
+		// If there are no documents to delete, the process is over.
+		if numDeleted == 0 {
+			break
+		}
+		// Commit the batch.
+		_, err := batch.Commit(ctx)
+		if err != nil {
+			log.Printf("An error while commiting batch to firestore: %s", err.Error())
+			log.Panic(err)
+		}
+	}
+	// ===============================================================
 	trackCounter := 0
 	userCounter := 0
 	iter := firestoreClient.Collection("users").Documents(ctx)
@@ -60,18 +91,18 @@ func MidnightRun(w http.ResponseWriter, r *http.Request) {
 			// for each one to a WriteBatch.
 			batch := firestoreClient.Batch()
 			for {
-				doc, err := iter.Next()
+				iterDoc, err := iter.Next()
 				if err == iterator.Done {
 					break
 				}
 				if err != nil {
 					log.Println(err.Error())
 				}
-				batch.Delete(doc.Ref)
+				batch.Delete(iterDoc.Ref)
 				numDeleted++
 			}
 			trackCounter += numDeleted
-			log.Printf("Deleted: %d", numDeleted)
+			log.Printf("Deleted: %d tracks", numDeleted)
 			// If there are no documents to delete, the process is over.
 			if numDeleted == 0 {
 				break
