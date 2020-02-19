@@ -37,8 +37,8 @@ func handleCreateCheckoutSession(c *gin.Context) {
 				},
 			},
 		},
-		SuccessURL: stripe.String("https://" + os.Getenv("CUSTOM_DOMAIN") + "/paymentsuccess.html?session_id={CHECKOUT_SESSION_ID}"),
-		CancelURL:  stripe.String("https://" + os.Getenv("CUSTOM_DOMAIN") + "/paymentcancel.html"),
+		SuccessURL: stripe.String("https://" + os.Getenv("CUSTOM_DOMAIN") + "/paymentsuccess?session_id={CHECKOUT_SESSION_ID}"),
+		CancelURL:  stripe.String("https://" + os.Getenv("CUSTOM_DOMAIN") + "/paymentcancel"),
 	}
 	if req.IsBuyingSticker {
 		params.LineItems = []*stripe.CheckoutSessionLineItemParams{
@@ -66,8 +66,7 @@ func handlePublicKey(c *gin.Context) {
 }
 
 func handleCheckoutSession(c *gin.Context) {
-
-	id := c.PostForm("sessionId")
+	id := c.Query("sessionId")
 	if id == "" {
 		log.Printf("CheckoutSession ID is missing from URL %s", c.Request.RequestURI)
 		c.JSON(http.StatusBadRequest, gin.H{"error": http.StatusText(http.StatusBadRequest)})

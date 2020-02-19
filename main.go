@@ -119,7 +119,6 @@ func init() {
 			"title": "Payment Successful",
 		})
 	})
-
 	router.POST("/create-checkout-session", handleCreateCheckoutSession)
 	router.GET("/checkout-session", handleCheckoutSession)
 	router.GET("/public-key", handlePublicKey)

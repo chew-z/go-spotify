@@ -19,24 +19,33 @@
                 </pre>
             </div>
         </div>  
-        <button onclick="window.location.href = '/';">Restart demo</button>
+        <button onclick="window.location.href = '/payment';">Pay once more</button>
     </div>
     <div class="sr-content">
 
     </div>
 </div>
 <script>
-var urlParams = new URLSearchParams(window.location.search);
-var sessionId = urlParams.get("session_id")
+let urlParams = new URLSearchParams(window.location.search);
+let sessionId = urlParams.get("session_id")
+console.log(sessionId)
 if (sessionId) {
-    fetch("/checkout-session?sessionId=" + sessionId).then(function(result){
-        return result.json()
-    }).then(function(session){
-        var sessionJSON = JSON.stringify(session, null, 2);
-        document.querySelector("pre").textContent = sessionJSON;
-    }).catch(function(err){
-        console.log('Error when fetching Checkout session', err);
-    });
+    fetch("/checkout-session?sessionId=" + sessionId)
+        .then((response) => {
+        console.log(response.status);
+        if (response.status >= 200 && response.status < 300) {
+            return Promise.resolve(response)
+        } else {
+            return Promise.reject(new Error(response.statusText))
+        } 
+        }).then((response) => {
+            return response.json()
+        }).then((data) => {
+            var sessionJSON = JSON.stringify(data, null, 2);
+            document.querySelector("pre").textContent = sessionJSON;
+        }).catch(function(err){
+            console.log('Error when fetching Checkout session', err);
+        });
 }
 </script>
 <!--Embed the footer.html template at this location-->
