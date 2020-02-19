@@ -13,7 +13,8 @@ const setupElements = function() {
         })
         .then((data) => {
             stripe = Stripe(data.publicKey);
-        });
+        })
+        .catch(() => console.log("Can’t access " + "/public-key" + " response. Blocked by browser?"));
 };
 
 const createCheckoutSession = function(isBuyingSticker) {
@@ -29,7 +30,8 @@ const createCheckoutSession = function(isBuyingSticker) {
         })
         .then(function(data) {
             checkoutSessionId = data.checkoutSessionId;
-        });
+        })
+        .catch(() => console.log("Can’t access " + "/create-checkout-session" + " response. Blocked by browser?"));
 };
 setupElements();
 createCheckoutSession(false);

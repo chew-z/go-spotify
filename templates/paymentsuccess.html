@@ -1,28 +1,16 @@
 <!--paymentsuccess.html-->
 <!--Embed the header.html template at this location-->
 {{ template "header.html" .}}
-<div class="sr-root">
-    <div class="sr-main">
-        <header class="sr-header">
-            <div class="sr-header__logo"></div>
-        </header>
-        <div class="sr-payment-summary completed-view">
-            <h1>Your test payment succeeded!</h1>
-            <h4>
-                View CheckoutSession response:</a>
-            </h4>
-        </div>
-        <div class="sr-section completed-view">
-            <div class="sr-callout">
-                <pre>
+<div class="container">
+    <h1 class="h1">Your test payment succeeded!</h1>
+    <button class="btn btn-info" onclick="window.location.href = '/payment';">Pay once more</button>
+    <div class="container-md">
+        <h4 class="h4">
+            View CheckoutSession response:</a>
+        </h4>
+        <pre>
 
-                </pre>
-            </div>
-        </div>  
-        <button onclick="window.location.href = '/payment';">Pay once more</button>
-    </div>
-    <div class="sr-content">
-
+        </pre>
     </div>
 </div>
 <script>
@@ -32,12 +20,12 @@ console.log(sessionId)
 if (sessionId) {
     fetch("/checkout-session?sessionId=" + sessionId)
         .then((response) => {
-        console.log(response.status);
-        if (response.status >= 200 && response.status < 300) {
-            return Promise.resolve(response)
-        } else {
-            return Promise.reject(new Error(response.statusText))
-        } 
+            console.log(response.status);
+            if (response.status >= 200 && response.status < 300) {
+                return Promise.resolve(response)
+            } else {
+                return Promise.reject(new Error(response.statusText))
+            } 
         }).then((response) => {
             return response.json()
         }).then((data) => {

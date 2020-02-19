@@ -23,16 +23,13 @@ type popularTrack struct {
 // retrieve token form firestore and for some
 //initialization
 type firestoreToken struct {
-	user    string        // Spotify user ID
-	country string        // The country of the user, as set in the user's account profile
-	path    string        // authorization path (gin routes group)
-	token   *oauth2.Token // Spotify token
+	user        string // Spotify user ID
+	displayname string
+	email       string
+	country     string        // The country of the user, as set in the user's account profile
+	path        string        // authorization path (gin routes group)
+	token       *oauth2.Token // Spotify token
 }
-
-// type timeZones struct {
-// 	Time string   `json:"time"`
-// 	Zone []string `json:"zone"`
-// }
 
 type navigation struct {
 	Endpoint string

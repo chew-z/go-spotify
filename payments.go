@@ -9,7 +9,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/stripe/stripe-go"
-	"github.com/stripe/stripe-go/checkout/session"
+	stripeSession "github.com/stripe/stripe-go/checkout/session"
 	"github.com/stripe/stripe-go/customer"
 	"github.com/stripe/stripe-go/webhook"
 )
@@ -17,6 +17,7 @@ import (
 var ()
 
 func handleCreateCheckoutSession(c *gin.Context) {
+	endpoint := c.Request.URL.Path
 	var req struct {
 		IsBuyingSticker bool `json:"isBuyingSticker"`
 	}
@@ -25,39 +26,53 @@ func handleCreateCheckoutSession(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-
-	params := &stripe.CheckoutSessionParams{
-		PaymentMethodTypes: stripe.StringSlice([]string{
-			"card",
-		}),
-		SubscriptionData: &stripe.CheckoutSessionSubscriptionDataParams{
-			Items: []*stripe.CheckoutSessionSubscriptionDataItemsParams{
-				&stripe.CheckoutSessionSubscriptionDataItemsParams{
-					Plan: stripe.String(os.Getenv("SUBSCRIPTION_PLAN_ID")),
+	spotifyClient := clientMagic(c)
+	if spotifyClient != nil {
+		u, err := spotifyClient.CurrentUser()
+		if err != nil {
+			log.Panic(err)
+		}
+		userID := string(u.ID)
+		userName := u.DisplayName
+		userEmail := u.Email
+		log.Printf("User: %s, email: %s", userName, userEmail)
+		params := &stripe.CheckoutSessionParams{
+			PaymentMethodTypes: stripe.StringSlice([]string{
+				"card",
+			}),
+			SubscriptionData: &stripe.CheckoutSessionSubscriptionDataParams{
+				Items: []*stripe.CheckoutSessionSubscriptionDataItemsParams{
+					&stripe.CheckoutSessionSubscriptionDataItemsParams{
+						Plan: stripe.String(os.Getenv("SUBSCRIPTION_PLAN_ID")),
+					},
 				},
 			},
-		},
-		SuccessURL: stripe.String("https://" + os.Getenv("CUSTOM_DOMAIN") + "/paymentsuccess?session_id={CHECKOUT_SESSION_ID}"),
-		CancelURL:  stripe.String("https://" + os.Getenv("CUSTOM_DOMAIN") + "/paymentcancel"),
-	}
-	if req.IsBuyingSticker {
-		params.LineItems = []*stripe.CheckoutSessionLineItemParams{
-			&stripe.CheckoutSessionLineItemParams{
-				Name:     stripe.String("Donation to suka.yoga"),
-				Quantity: stripe.Int64(1),
-				Amount:   stripe.Int64(1000),
-				Currency: stripe.String(string(stripe.CurrencyEUR)),
-			},
+			SuccessURL:        stripe.String("https://" + os.Getenv("CUSTOM_DOMAIN") + "/paymentsuccess?session_id={CHECKOUT_SESSION_ID}"),
+			CancelURL:         stripe.String("https://" + os.Getenv("CUSTOM_DOMAIN") + "/paymentcancel"),
+			ClientReferenceID: stripe.String(userID),
+			CustomerEmail:     stripe.String(userEmail), //TODO - this is enverified email. Is is necessary? CustomerEmail or Customer not both
 		}
-	}
+		if req.IsBuyingSticker {
+			params.LineItems = []*stripe.CheckoutSessionLineItemParams{
+				&stripe.CheckoutSessionLineItemParams{
+					Name:     stripe.String("Donation to suka.yoga"),
+					Quantity: stripe.Int64(1),
+					Amount:   stripe.Int64(1000),
+					Currency: stripe.String(string(stripe.CurrencyEUR)),
+				},
+			}
+		}
 
-	session, err := session.New(params)
-	if err != nil {
-		log.Printf("session.New: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		stripeSess, err := stripeSession.New(params)
+		if err != nil {
+			log.Printf("session.New: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"checkoutSessionId": stripeSess.ID})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"checkoutSessionId": session.ID})
+	c.JSON(http.StatusTeapot, gin.H{endpoint: "failed to find  client"})
 }
 
 func handlePublicKey(c *gin.Context) {
@@ -75,7 +90,7 @@ func handleCheckoutSession(c *gin.Context) {
 
 	// Fetch the CheckoutSession object from your success page
 	// to get details about the order
-	session, err := session.Get(id, nil)
+	stripeSess, err := stripeSession.Get(id, nil)
 
 	if err != nil {
 		log.Printf("An error happened when getting the CheckoutSession %q from Stripe: %v", id, err)
@@ -83,7 +98,7 @@ func handleCheckoutSession(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"CheckoutSession": session})
+	c.JSON(http.StatusOK, gin.H{"CheckoutSession": stripeSess})
 }
 
 func handleWebhook(c *gin.Context) {
@@ -112,9 +127,9 @@ func handleWebhook(c *gin.Context) {
 	}
 
 	if event.GetObjectValue("display_items", "0", "custom") != "" &&
-		event.GetObjectValue("display_items", "0", "custom", "name") == "Pasha e-book" {
-		log.Printf("🔔 Customer is subscribed and bought an e-book! Send the e-book to %s", cust.Email)
+		event.GetObjectValue("display_items", "0", "custom", "name") == "Donation" {
+		log.Printf("🔔 Customer is subscribed and made a donation! Send the thank you note to %s", cust.Email)
 	} else {
-		log.Printf("🔔 Customer is subscribed but did not buy an e-book.")
+		log.Printf("🔔 Customer is subscribed but did not made a donation.")
 	}
 }

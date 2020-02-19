@@ -31,7 +31,7 @@ var (
 	// Warning token will fail if you are changing scope (even if you narrow it down) so you might end up with bunch
 	// of useless stored tokens that will keep failing
 	// TODO - procedure for clearing useless token (users will have to re-authorize with Spotify)
-	auth = spotify.NewAuthenticator(redirectURI, spotify.ScopeUserReadPrivate, spotify.ScopeUserTopRead, spotify.ScopeUserLibraryRead, spotify.ScopeUserFollowRead, spotify.ScopeUserReadRecentlyPlayed, spotify.ScopePlaylistModifyPublic, spotify.ScopePlaylistModifyPrivate, spotify.ScopePlaylistReadCollaborative, spotify.ScopePlaylistReadPrivate) // clientChannel = make(chan *spotify.Client)
+	auth = spotify.NewAuthenticator(redirectURI, spotify.ScopeUserReadEmail, spotify.ScopeUserReadPrivate, spotify.ScopeUserTopRead, spotify.ScopeUserLibraryRead, spotify.ScopeUserFollowRead, spotify.ScopeUserReadRecentlyPlayed, spotify.ScopePlaylistModifyPublic, spotify.ScopePlaylistModifyPrivate, spotify.ScopePlaylistReadCollaborative, spotify.ScopePlaylistReadPrivate) // clientChannel = make(chan *spotify.Client)
 )
 
 /* statefull authorization handler using channels
@@ -95,6 +95,8 @@ func login(c *gin.Context) {
 		// save token to Firestore
 		var newTok firestoreToken
 		newTok.user = string(user.ID)
+		newTok.displayname = user.DisplayName
+		newTok.email = user.Email
 		newTok.country = string(user.Country)
 		newTok.path = endpoint
 		newTok.token = newToken
@@ -104,9 +106,12 @@ func login(c *gin.Context) {
 		// save necessary variables into session
 		session := sessions.Default(c)
 		// TODO - is it necessary and what would be optimal?
+
 		sessions.Default(c).Options(sessions.Options{MaxAge: sessionTimeout}) // make a session timeout after X seconds of inactivity
 		log.Printf("/login: %s from %s", string(user.ID), string(user.Country))
 		session.Set("user", string(user.ID))
+		session.Set("email", user.Email)
+		session.Set("displayname", user.DisplayName)
 		session.Set("country", string(user.Country))
 		session.Set("authPath", endpoint)
 		session.Set("uuid", uuid)
