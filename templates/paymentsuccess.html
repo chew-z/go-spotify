@@ -1,0 +1,43 @@
+<!--paymentsuccess.html-->
+<!--Embed the header.html template at this location-->
+{{ template "header.html" .}}
+<div class="sr-root">
+    <div class="sr-main">
+        <header class="sr-header">
+            <div class="sr-header__logo"></div>
+        </header>
+        <div class="sr-payment-summary completed-view">
+            <h1>Your test payment succeeded!</h1>
+            <h4>
+                View CheckoutSession response:</a>
+            </h4>
+        </div>
+        <div class="sr-section completed-view">
+            <div class="sr-callout">
+                <pre>
+
+                </pre>
+            </div>
+        </div>  
+        <button onclick="window.location.href = '/';">Restart demo</button>
+    </div>
+    <div class="sr-content">
+
+    </div>
+</div>
+<script>
+var urlParams = new URLSearchParams(window.location.search);
+var sessionId = urlParams.get("session_id")
+if (sessionId) {
+    fetch("/checkout-session?sessionId=" + sessionId).then(function(result){
+        return result.json()
+    }).then(function(session){
+        var sessionJSON = JSON.stringify(session, null, 2);
+        document.querySelector("pre").textContent = sessionJSON;
+    }).catch(function(err){
+        console.log('Error when fetching Checkout session', err);
+    });
+}
+</script>
+<!--Embed the footer.html template at this location-->
+{{ template "footer.html" .}}

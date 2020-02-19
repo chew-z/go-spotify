@@ -12,6 +12,7 @@ import (
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
+	"github.com/stripe/stripe-go"
 	"golang.org/x/time/rate"
 )
 
@@ -43,6 +44,7 @@ func init() {
 		if checkNet() {
 			log.Println("THERE IS NOTHING we can do without access to internet")
 		}
+		stripe.Key = os.Getenv("STRIPE_SECRET_KEY")
 	}()
 
 	firestoreClient = initFirestoreDatabase(ctx)
@@ -100,6 +102,28 @@ func init() {
 	})
 	router.GET("/callback", callback)
 	router.GET("/login", login)
+	// Payments - Stripe
+	// router.Use(static.Serve("/", static.LocalFile(os.Getenv("STATIC_DIR"), false)))
+	router.GET("/payment", func(c *gin.Context) {
+		c.HTML(http.StatusOK, "payment.html", gin.H{
+			"title": "Payment",
+		})
+	})
+	router.GET("/paymentcancel", func(c *gin.Context) {
+		c.HTML(http.StatusOK, "paymentcancel.html", gin.H{
+			"title": "Cancel Payment",
+		})
+	})
+	router.GET("/paymentsuccess", func(c *gin.Context) {
+		c.HTML(http.StatusOK, "paymentsuccess.html", gin.H{
+			"title": "Payment Successful",
+		})
+	})
+
+	router.POST("/create-checkout-session", handleCreateCheckoutSession)
+	router.GET("/checkout-session", handleCheckoutSession)
+	router.GET("/public-key", handlePublicKey)
+	router.POST("/webhook", handleWebhook)
 
 	// Custom domain middleware
 	router.Use(Redirector()) // middleware works for endpoints below

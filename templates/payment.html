@@ -1,0 +1,33 @@
+<!--payment.html-->
+<!-- <link rel="stylesheet" href="css/normalize.css" /> -->
+<!--  <link rel="stylesheet" href="css/global.css" /> -->
+<!-- </head> -->
+
+{{ template "header.html" .}}
+<div class="container">
+    <script src="https://js.stripe.com/v3/"></script>
+    <script src="/static/stripe.js" defer></script>
+    <div class="card"> 
+        <div class="card-header">
+            Subscribe
+        </div>
+        <img src="/static/music.svg" class="img-fluid" style="object-fit: cover;" alt="music.suka.yoga">
+        <div class="card-body text-center">
+            <h1 class="card-title">€12.90</h1>
+            <h4 class="card-subtitle">anual subscription</h4>
+            <button id="submit" class="btn btn-success">Checkout</button>
+        </div>
+            <div class="input-group">
+                <label class="input-group-text">
+                    <input type="checkbox" name="donation" aria-label="Donation checkbox">
+                    &nbsp;Make a donation to suka.yoga (+€10.00)
+                </label>
+            </div>
+        <div class="card-footer text-muted">
+            Your card will be charged <strong><span id="order-total">€12.90</span></strong> and then billed <strong>€12.90</strong> each year unless you cancel.
+        </div>
+    </div>
+</div>
+</div>
+<!--Embed the footer.html template at this location-->
+{{ template "footer.html" .}}
