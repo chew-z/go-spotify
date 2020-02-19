@@ -23,10 +23,12 @@ type popularTrack struct {
 // retrieve token form firestore and for some
 //initialization
 type firestoreToken struct {
-	user        string // Spotify user ID
-	displayname string
-	email       string
-	country     string        // The country of the user, as set in the user's account profile
+	user        string        `firestore:"userID"` // Spotify user ID
+	displayname string        `firestore:"user_displayname,omitempty"`
+	email       string        `firestore:"user_email,omitempty"`
+	premium     bool          `firestore:"premium_user,omitempty"`
+	expiration  time.Time     `firestore:"subscription_expires,omitempty"`
+	country     string        `firestore:"country,omitempty"` // The country of the user, as set in the user's account profile
 	path        string        // authorization path (gin routes group)
 	token       *oauth2.Token // Spotify token
 }
@@ -85,10 +87,12 @@ type frontendAlbumPlaylist struct {
 }
 
 type userLocation struct {
-	Name    string
-	URL     string
-	Country string
-	Lat     string
-	Lon     string
-	City    string
+	Name       string
+	Premium    bool
+	Expiration time.Time
+	URL        string
+	Country    string
+	Lat        string
+	Lon        string
+	City       string
 }

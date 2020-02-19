@@ -103,15 +103,14 @@ func init() {
 	router.GET("/callback", callback)
 	router.GET("/login", login)
 	// Payments - Stripe
-	// router.Use(static.Serve("/", static.LocalFile(os.Getenv("STATIC_DIR"), false)))
 	router.GET("/payment", func(c *gin.Context) {
 		c.HTML(http.StatusOK, "payment.html", gin.H{
-			"title": "Payment",
+			"title": "Subscription",
 		})
 	})
 	router.GET("/paymentcancel", func(c *gin.Context) {
 		c.HTML(http.StatusOK, "paymentcancel.html", gin.H{
-			"title": "Cancel Payment",
+			"title": "Canceled Payment",
 		})
 	})
 	router.GET("/paymentsuccess", func(c *gin.Context) {

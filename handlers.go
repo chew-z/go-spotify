@@ -400,6 +400,12 @@ func user(c *gin.Context) {
 		User.Country = user.Country
 		User.Name = user.DisplayName
 		User.URL = user.ExternalURLs["spotify"]
+		dsnap, err := firestoreClient.Collection("users").Doc(user.ID).Get(ctx)
+		if err != nil {
+			log.Printf("Error retrieving token from Firestore for %s %s.\nPossibly it ain't there..", user.ID, err.Error())
+		}
+		tok := dsnap.Data()
+		User.Premium = tok["premium_user"].(bool)
 		c.HTML(
 			http.StatusOK,
 			"user.html",

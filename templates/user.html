@@ -5,7 +5,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.24.0/moment.min.js" integrity="sha256-4iQZ6BVL4qNKlQ27TExEhBN1HFPvAvAMbFavKKosSWQ=" crossorigin="anonymous"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/moment-timezone/0.5.27/moment-timezone-with-data-2012-2022.min.js" integrity="sha256-gfmyBrlUtChLivBA2rRK/bsljMoum6kxbl7oFeCVkmc=" crossorigin="anonymous"></script>
 <script>
-$( document ).ready(function() {    
+$( document ).ready(function() {
     const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
     // const gotime = 1000 * {{ .Location.UnixTime }}
     let now = moment().tz(tz).format('HH:mm');  
@@ -18,8 +18,14 @@ $( document ).ready(function() {
     {{ with .User }}
     <h6 class="display-4">You are logged in as <a href="{{ .URL }}">{{ .Name }}</a>.</h6>
     <p class="lead">Your Spotify account is from <strong>{{ .Country }}</strong></p>
-    {{ end }}
     <p>Your timezone is probably <mark id="timezone"></mark> and the time is <strong id="time"></strong>
+    {{ if .Premium }}
+    <p>You are premium user. We are grateful for your support. If you have any problems or suggestions please let us know.</p>
+    {{ else }}
+    <p>You are infrequent user. It is cool and you are welcome here.</p>
+    <p>But developing the app and running servers in the cloud costs time and money so please <a class="btn btn-success" role="button" href="/payment">subscribe</a> if you like the app and use it often.</p>
+    {{ end }}
+    {{ end }}
 </div>
 <div id="installPWA" class="toast" role="alert" aria-live="assertive" aria-atomic="true" data-delay="10000" style="position: absolute; top: 1rem; right: 1rem;">
     <div class="toast-header">
