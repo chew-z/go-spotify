@@ -1,55 +1,50 @@
 let stripe;
 let checkoutSessionId;
 
-const setupElements = function() {
-    fetch('/public-key', {
-        method: 'GET',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-    })
-        .then((result) => {
-            return result.json();
-        })
-        .then((data) => {
-            stripe = Stripe(data.publicKey);
-        })
-        .catch(() => console.log("Can’t access " + "/public-key" + " response. Blocked by browser?"));
-};
-
-const createCheckoutSession = function(isBuyingSticker) {
-    fetch('/create-checkout-session', {
+async function setupElements() {
+    const response = await fetch('/stripe-public-key', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ isBuyingSticker }),
-    })
-        .then(function(result) {
-            return result.json();
-        })
-        .then(function(data) {
-            checkoutSessionId = data.checkoutSessionId;
-        })
-        .catch(() => console.log("Can’t access " + "/create-checkout-session" + " response. Blocked by browser?"));
-};
-setupElements();
-createCheckoutSession(false);
+    });
 
-let donation = document.querySelector("input[name=donation]");
+    return await response.json();
+}
 
-$('input[name=donation]').change(function(){
-    if($(this).is(':checked')) {
+async function createCheckoutSession(isDonation) {
+    const response = await fetch('/create-checkout-session', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ isDonation }),
+    });
+
+    return await response.json();
+}
+
+setupElements().then((data) => {
+    stripe = Stripe(data.publicKey);
+});
+
+createCheckoutSession(false).then((data) => {
+    checkoutSessionId = data.checkoutSessionId;
+});
+
+$('input[name=donation]').change(() => {
+    if ($(this).is(':checked')) {
         // Checkbox is checked..
         createCheckoutSession(true);
-        $('#order-total').text('€22.90')
+        $('#order-total').text('€22.90');
     } else {
         // Checkbox is not checked..
         createCheckoutSession(false);
-        $('#order-total').text('€12.90')
+        $('#order-total').text('€12.90');
     }
 });
 
+// const donation = document.querySelector('input[name=donation]');
 // document.querySelector('input[name="subscribe"]').addEventListener('change', (evt) => {
 //     if (this.checked) {
 //         createCheckoutSession(true);

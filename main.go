@@ -102,33 +102,21 @@ func init() {
 	})
 	router.GET("/callback", callback)
 	router.GET("/login", login)
-	// Payments - Stripe
-	router.GET("/payment", func(c *gin.Context) {
-		c.HTML(http.StatusOK, "payment.html", gin.H{
-			"title": "Subscription",
-		})
-	})
-	router.GET("/paymentcancel", func(c *gin.Context) {
-		c.HTML(http.StatusOK, "paymentcancel.html", gin.H{
-			"title": "Canceled Payment",
-		})
-	})
-	router.GET("/paymentsuccess", func(c *gin.Context) {
-		c.HTML(http.StatusOK, "paymentsuccess.html", gin.H{
-			"title": "Payment Successful",
-		})
-	})
+	// Stripe
 	router.POST("/create-checkout-session", handleCreateCheckoutSession)
+	router.POST("/stripe-public-key", handlePublicKey)
 	router.GET("/checkout-session", handleCheckoutSession)
-	router.GET("/public-key", handlePublicKey)
-	router.POST("/webhook", handleWebhook)
-
 	// Custom domain middleware
 	router.Use(Redirector()) // middleware works for endpoints below
 	// Authorization middleware
 	authorized := router.Group("/")
 	authorized.Use(AuthenticationRequired("/user"))
 	{
+		authorized.GET("/payment", func(c *gin.Context) {
+			c.HTML(http.StatusOK, "payment.html", gin.H{
+				"title": "Subscription",
+			})
+		})
 		// HTML pages
 		authorized.GET("/top", top)
 		authorized.GET("/popular", popular)
@@ -143,7 +131,6 @@ func init() {
 		authorized.GET("/playlisttracks", playlistTracks)
 		authorized.GET("/albumtracks", albumTracks)
 		// TODO - make useful
-		// TXT pages TODO
 		authorized.GET("/artists", artists)
 		authorized.GET("/search", search)
 		authorized.GET("/recommend", recommend)

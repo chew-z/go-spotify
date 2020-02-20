@@ -405,7 +405,12 @@ func user(c *gin.Context) {
 			log.Printf("Error retrieving token from Firestore for %s %s.\nPossibly it ain't there..", user.ID, err.Error())
 		}
 		tok := dsnap.Data()
-		User.Premium = tok["premium_user"].(bool)
+		u := tok["premium_user"]
+		if u == nil {
+			User.Premium = false
+		} else {
+			User.Premium = u.(bool)
+		}
 		c.HTML(
 			http.StatusOK,
 			"user.html",

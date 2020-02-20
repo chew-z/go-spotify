@@ -38,11 +38,12 @@ PS. The movie Midnight Run is great https://youtu.be/LF8cT6ivlr4
 */
 func MidnightRun(w http.ResponseWriter, r *http.Request) {
 	defer firestoreClient.Close()
-
-	ref := firestoreClient.Collection("users").Where("token_updated", "<", time.Now().AddDate(0, 0, -7)) // 7 days
+	// TODO - start anew
+	query := firestoreClient.Collection("users").Where("token_updated", "<", time.Now().AddDate(0, 0, -7)) // 7 days
 	for {
-		batchSize := 50
-		iter := ref.Limit(batchSize).Documents(ctx)
+		batchSize := 25
+		iter := query.Limit(batchSize).Documents(ctx)
+		defer iter.Stop()
 		numDeleted := 0
 		batch := firestoreClient.Batch()
 		for {
