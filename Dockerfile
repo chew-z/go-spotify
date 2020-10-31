@@ -2,7 +2,7 @@
 # This is based on Debian and sets the GOPATH to /go.
 # https://hub.docker.com/_/golang
 # FROM golang:1.13 as builder
-FROM golang:1.13-buster as builder
+FROM golang:1.15-buster as builder
 
 # Create and change to the app directory.
 WORKDIR /go/src/cloudrun/spotify
@@ -25,7 +25,15 @@ RUN CGO_ENABLED=0 GOOS=linux go build -v -o go-spotify
 # FROM marketplace.gcr.io/google/debian9:latest
 # or Google distroless images = 'precisely what's necessary for your app'
 # https://github.com/GoogleContainerTools/distroless debian buster for go1.13
-FROM gcr.io/distroless/base-debian10
+# FROM gcr.io/distroless/base-debian10
+
+# Use the official Debian slim image for a lean production container.
+# https://hub.docker.com/_/debian
+# https://docs.docker.com/develop/develop-images/multistage-build/#use-multi-stage-builds
+FROM debian:buster-slim
+RUN set -x && apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
+    ca-certificates && \
+    rm -rf /var/lib/apt/lists/*
 
 # Copy the binary to the production image from the builder stage.
 # COPY --from=builder /go/src/cloudrun/spotify/go-spotify /go-spotify
