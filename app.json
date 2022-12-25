@@ -1,9 +1,9 @@
 {
-  "name": "go-spotify",
+  "name": "music-suka-yoga",
   "env": {
     "PROJECT_ID": {
       "description": "specify your Google Project ID",
-      "value": "go-spotify-",
+      "value": "music-suka-yoga-",
       "required": false
     },
     "GIN_MODE": {

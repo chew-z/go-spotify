@@ -1,3 +1,4 @@
+.DS_Store
 bin/**
 CloudFunctions/**
 .env.yaml

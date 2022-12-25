@@ -5,7 +5,7 @@
       "entrypoint": "bash",
       "args": [
         "-c",
-        "docker pull gcr.io/$PROJECT_ID/go-spotify:latest || exit 0"
+        "docker pull gcr.io/$PROJECT_ID/music-suka-yoga:latest || exit 0"
       ]
     },
     {
@@ -13,9 +13,9 @@
       "args": [
         "build",
         "-t",
-        "gcr.io/$PROJECT_ID/go-spotify:latest",
+        "gcr.io/$PROJECT_ID/music-suka-yoga:latest",
         "--cache-from",
-        "gcr.io/$PROJECT_ID/go-spotify:latest",
+        "gcr.io/$PROJECT_ID/music-suka-yoga:latest",
         "."
       ]
     },
@@ -23,7 +23,7 @@
       "name": "gcr.io/cloud-builders/docker",
       "args": [
         "push",
-        "gcr.io/$PROJECT_ID/go-spotify"
+        "gcr.io/$PROJECT_ID/music-suka-yoga"
       ]
     },
     {
@@ -31,11 +31,11 @@
       "args": [
         "run",
         "deploy",
-        "cloud-run-hello",
+        "music-suka-yoga",
         "--image",
-        "gcr.io/$PROJECT_ID/go-spotify",
+        "gcr.io/$PROJECT_ID/music-suka-yoga",
         "--region",
-        "europe-west1",
+        "europe-central2",
         "--platform",
         "managed",
         "--allow-unauthenticated"
@@ -43,6 +43,6 @@
     }
   ],
   "images": [
-    "gcr.io/$PROJECT_ID/go-spotify:latest"
+    "gcr.io/$PROJECT_ID/music-suka-yoga:latest"
   ]
 }

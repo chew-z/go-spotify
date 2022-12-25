@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"os"
 	"time"
 
 	"cloud.google.com/go/firestore"
@@ -26,7 +25,8 @@ func init() {
 	firestoreClient = initFirestoreDatabase(ctx)
 }
 
-/*MidnightRun - does litmus configuration
+/*
+MidnightRun - does litmus configuration
 also takes care of database maintenance
 It removes all tracks listened to more then a week ago
 TODO - it should also clean unused and failed tokens
@@ -125,12 +125,9 @@ func MidnightRun(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-/*initFirestoreDatabase - as the name says creates Firestore client
-in Google Cloud it is using project ID, on localhost credentials file
-*/
 func initFirestoreDatabase(ctx context.Context) *firestore.Client {
-	// sa := option.WithCredentialsFile(".firebase-credentials.json")
-	firestoreClient, err := firestore.NewClient(ctx, os.Getenv("GOOGLE_CLOUD_PROJECT"))
+	// use Cloud credentials and roles
+	firestoreClient, err := firestore.NewClient(ctx, firestore.DetectProjectID)
 	if err != nil {
 		log.Panic(err)
 	}

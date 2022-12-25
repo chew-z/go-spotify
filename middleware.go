@@ -12,12 +12,13 @@ import (
 	"golang.org/x/time/rate"
 )
 
-/*Redirector - middleware for redirecting CloudRun
+/*
+Redirector - middleware for redirecting CloudRun
 to custom domain
 */
 func Redirector() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if gcr == "YES" {
+		if gcr == "YES" && gcrDomain != customDomain {
 			if domain := c.Request.Host; domain == gcrDomain {
 				url := fmt.Sprintf("https://%s%s", customDomain, c.Request.URL.Path)
 				if qs := c.Request.URL.RawQuery; qs != "" {
@@ -33,7 +34,8 @@ func Redirector() gin.HandlerFunc {
 	}
 }
 
-/*Headers - middleware for adding custom
+/*
+Headers - middleware for adding custom
 headers - also by path
 */
 func Headers() gin.HandlerFunc {
@@ -47,7 +49,8 @@ func Headers() gin.HandlerFunc {
 
 var limiterSet = cache.New(15*time.Minute, 3*time.Minute)
 
-/*RateLimiter -a in-memory middleware to limit access rate
+/*
+RateLimiter -a in-memory middleware to limit access rate
 by custom key and rate
 */
 func RateLimiter(key func(*gin.Context) string, createLimiter func(*gin.Context) (*rate.Limiter, time.Duration),

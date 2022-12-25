@@ -5,12 +5,10 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"os"
 	"strings"
 	"time"
 
 	"cloud.google.com/go/firestore"
-	firebase "firebase.google.com/go"
 )
 
 // FirestoreEvent is the payload of a Firestore event.
@@ -48,27 +46,28 @@ type FirestoreValue struct {
 // }
 
 var (
+	ctx             = context.Background()
 	firestoreClient *firestore.Client
-	projectID       = os.Getenv("GOOGLE_CLOUD_PROJECT")
 )
 
 func main() {
 }
 
 func init() {
-	// Use the application default credentials.
-	conf := &firebase.Config{ProjectID: projectID}
-	// Use context.Background() because the app/client should persist across
-	// invocations.
-	ctx := context.Background()
-	app, err := firebase.NewApp(ctx, conf)
-	if err != nil {
-		log.Panicf("firebase.NewApp: %v", err)
-	}
-	firestoreClient, err = app.Firestore(ctx)
-	if err != nil {
-		log.Fatalf("app.Firestore: %v", err)
-	}
+	// // Use the application default credentials.
+	// conf := &firebase.Config{ProjectID: projectID}
+	// // Use context.Background() because the app/client should persist across
+	// // invocations.
+	// ctx := context.Background()
+	// app, err := firebase.NewApp(ctx, conf)
+	// if err != nil {
+	// 	log.Panicf("firebase.NewApp: %v", err)
+	// }
+	// firestoreClient, err = app.Firestore(ctx)
+	// if err != nil {
+	// 	log.Fatalf("app.Firestore: %v", err)
+	// }
+	firestoreClient = initFirestoreDatabase(ctx)
 }
 
 // CloudCounter is triggered by a change to a Firestore document.
@@ -94,14 +93,11 @@ func CloudCounter(ctx context.Context, e FirestoreEvent) error {
 	return nil
 }
 
-/*initFirestoreDatabase - as the name says creates Firestore client
-in Google Cloud it is using project ID, on localhost credentials file
-*/
-// func initFirestoreDatabase(ctx context.Context) *firestore.Client {
-// 	// sa := option.WithCredentialsFile(".firebase-credentials.json")
-// 	firestoreClient, err := firestore.NewClient(ctx, os.Getenv("GOOGLE_CLOUD_PROJECT"))
-// 	if err != nil {
-// 		log.Panic(err)
-// 	}
-// 	return firestoreClient
-// }
+func initFirestoreDatabase(ctx context.Context) *firestore.Client {
+	// use Cloud credentials and roles
+	firestoreClient, err := firestore.NewClient(ctx, firestore.DetectProjectID)
+	if err != nil {
+		log.Panic(err)
+	}
+	return firestoreClient
+}

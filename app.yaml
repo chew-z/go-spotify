@@ -1,5 +1,5 @@
 ---
-runtime: go113
+runtime: go119
 env: standard
 
 # for multiple users and traffic all over the day

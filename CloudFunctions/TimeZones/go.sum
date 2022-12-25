@@ -1,6 +1,6 @@
-github.com/gorilla/schema v1.1.0 h1:CamqUDOFUBqzrvxuz2vEwo8+SUdwsluFh7IlzJh30LY=
-github.com/gorilla/schema v1.1.0/go.mod h1:kgLaKoK1FELgZqMAVxx/5cbj0kT+57qxUrAlIO2eleU=
+github.com/gorilla/schema v1.2.0 h1:YufUaxZYCKGFuAq3c96BOhjgd5nmXiOY9NGzF247Tsc=
+github.com/gorilla/schema v1.2.0/go.mod h1:kgLaKoK1FELgZqMAVxx/5cbj0kT+57qxUrAlIO2eleU=
 github.com/machinebox/progress v0.2.0/go.mod h1:hl4FywxSjfmkmCrersGhmJH7KwuKl+Ueq9BXkOny+iE=
 github.com/matryer/is v1.2.0/go.mod h1:2fLPjFQM9rhQ15aVEtbuwhJinnOqrmgXPNdZsdwlWXA=
-gopkg.in/ugjka/go-tz.v2 v2.0.8 h1:EmQ1tY6aa9upe1EDqyPdyHgM9STimr2fw7+b/CuMQ94=
-gopkg.in/ugjka/go-tz.v2 v2.0.8/go.mod h1:l93M5EnjrSTTaABtGKIqNcl+z08IYbVDS7v1VA8+PgU=
+gopkg.in/ugjka/go-tz.v2 v2.0.13 h1:qINe+KRaz7zGkoKBmpYWaMvkxjV8XtcESzs7LJ5Fw4A=
+gopkg.in/ugjka/go-tz.v2 v2.0.13/go.mod h1:1iX2y1/xUdZjNIyGW/dLRRinbWrntuHYc9oIkGWFvz4=
